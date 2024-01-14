@@ -12,11 +12,13 @@ if __name__ == '__main__':
 
     dataset_directory = settings.DATA / 'eeg_subsample'
     dataset_directory.mkdir(parents=True, exist_ok=True)
+    (dataset_directory / 'eegs').mkdir(parents=True, exist_ok=True)
 
     eeg_directory = settings.DATA / 'hms-harmful-brain-activity-classification' / 'train_eegs'
     eeg_file_names = os.listdir(eeg_directory)
 
     df_train = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
+    metadata = []
 
     for eeg_id, df_train_eeg in tqdm(df_train.groupby('eeg_id'), total=df_train['eeg_id'].nunique()):
 
@@ -28,6 +30,22 @@ if __name__ == '__main__':
             start_idx = int(row['eeg_label_offset_seconds'] * 200)
             end_idx = int((row['eeg_label_offset_seconds'] + 50) * 200)
             df_eeg_subsample = df_eeg.iloc[start_idx:end_idx].reset_index(drop=True)
+            eeg_file_path = dataset_directory / 'eegs' / f'{eeg_id}_{eeg_sub_id}.npy'
 
-            eeg_file_path = dataset_directory / f'{eeg_id}_{eeg_sub_id}.npy'
+            nan_counts = df_eeg_subsample.isnull().sum().to_dict()
+            nan_counts = {f'{k}_nan_count': v for k, v in nan_counts.items()}
+
+            metadata_dict = {
+                'eeg_id': eeg_id,
+                'eeg_sub_id': eeg_sub_id,
+                'row_count': df_eeg_subsample.shape[0],
+                'column_count': df_eeg_subsample.shape[1]
+            }
+            metadata_dict.update(nan_counts)
+            metadata.append(metadata_dict)
+
             np.save(eeg_file_path, df_eeg_subsample.values)
+
+    df_metadata = pd.DataFrame(metadata)
+    df_metadata.to_csv(dataset_directory / 'metadata.csv', index=False)
+    settings.logger.info(f'metadata.csv is saved to {dataset_directory}')
