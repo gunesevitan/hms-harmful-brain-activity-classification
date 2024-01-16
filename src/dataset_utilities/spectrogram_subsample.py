@@ -33,7 +33,8 @@ if __name__ == '__main__':
                 start_time += 1
             end_time = start_time + 598
 
-            df_spectrogram_subsample = df_spectrogram.loc[(df_spectrogram['time'] >= start_time) & (df_spectrogram['time'] <= end_time)].reset_index(drop=True)
+            df_spectrogram_subsample = df_spectrogram.loc[(df_spectrogram['time'] >= start_time) & (df_spectrogram['time'] <= end_time)].iloc[:, 1:]
+            df_spectrogram_subsample = df_spectrogram_subsample.ffill().bfill()
             spectrogram_file_path = dataset_directory / 'spectrograms' / f'{spectrogram_id}_{spectrogram_sub_id}.npy'
 
             nan_counts = df_spectrogram_subsample.isnull().sum().to_dict()
