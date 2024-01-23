@@ -23,6 +23,11 @@ if __name__ == '__main__':
     for spectrogram_id, df_train_spectrogram in tqdm(df_train.groupby('spectrogram_id'), total=df_train['spectrogram_id'].nunique()):
 
         df_spectrogram = pd.read_parquet(spectrogram_directory / f'{spectrogram_id}.parquet')
+        spectrogram_columns = df_spectrogram.columns.tolist()
+        left_temporal_chain = [column for column in spectrogram_columns if column.startswith('LL')]
+        right_temporal_chain = [column for column in spectrogram_columns if column.startswith('RL')]
+        left_parasagittal_chain = [column for column in spectrogram_columns if column.startswith('LP')]
+        right_parasagittal_chain = [column for column in spectrogram_columns if column.startswith('RP')]
 
         for _, row in df_train_spectrogram.iterrows():
 
@@ -34,7 +39,7 @@ if __name__ == '__main__':
             end_time = start_time + 598
 
             df_spectrogram_subsample = df_spectrogram.loc[(df_spectrogram['time'] >= start_time) & (df_spectrogram['time'] <= end_time)].iloc[:, 1:]
-            df_spectrogram_subsample = df_spectrogram_subsample.ffill().bfill()
+            df_spectrogram_subsample = df_spectrogram_subsample.fillna(0)
             spectrogram_file_path = dataset_directory / 'spectrograms' / f'{spectrogram_id}_{spectrogram_sub_id}.npy'
 
             nan_counts = df_spectrogram_subsample.isnull().sum().to_dict()
@@ -49,7 +54,13 @@ if __name__ == '__main__':
             metadata_dict.update(nan_counts)
             metadata.append(metadata_dict)
 
-            np.save(spectrogram_file_path, df_spectrogram_subsample.values)
+            spectrogram = np.stack([
+                df_spectrogram_subsample[left_temporal_chain].values,
+                df_spectrogram_subsample[right_temporal_chain].values,
+                df_spectrogram_subsample[left_parasagittal_chain].values,
+                df_spectrogram_subsample[right_parasagittal_chain].values
+            ], axis=-1)
+            np.save(spectrogram_file_path, spectrogram)
 
     df_metadata = pd.DataFrame(metadata)
     df_metadata.to_csv(dataset_directory / 'metadata.csv', index=False)
