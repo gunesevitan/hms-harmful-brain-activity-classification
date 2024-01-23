@@ -15,8 +15,8 @@ if __name__ == '__main__':
     spectrogram_file_names = os.listdir(dataset_directory)
 
     sample_count = 0
-    signal_sum = np.zeros(400)
-    signal_squared_sum = np.zeros(400)
+    signal_sum = np.zeros(4)
+    signal_squared_sum = np.zeros(4)
 
     for file_name in tqdm(spectrogram_file_names):
 
@@ -27,8 +27,8 @@ if __name__ == '__main__':
             continue
 
         sample_count += spectrogram.shape[0]
-        signal_sum += np.sum(spectrogram, axis=0)
-        signal_squared_sum += np.sum(spectrogram ** 2, axis=0)
+        signal_sum += np.sum(spectrogram, axis=(0, 1))
+        signal_squared_sum += np.sum(spectrogram ** 2, axis=(0, 1))
 
     mean = signal_sum / sample_count
     var = (signal_squared_sum / sample_count) - (mean ** 2)
