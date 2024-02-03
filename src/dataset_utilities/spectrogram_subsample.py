@@ -20,6 +20,8 @@ if __name__ == '__main__':
     df_train = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
     metadata = []
 
+    channels = False
+
     for spectrogram_id, df_train_spectrogram in tqdm(df_train.groupby('spectrogram_id'), total=df_train['spectrogram_id'].nunique()):
 
         df_spectrogram = pd.read_parquet(spectrogram_directory / f'{spectrogram_id}.parquet')
@@ -54,12 +56,16 @@ if __name__ == '__main__':
             metadata_dict.update(nan_counts)
             metadata.append(metadata_dict)
 
-            spectrogram = np.stack([
-                df_spectrogram_subsample[left_temporal_chain].values,
-                df_spectrogram_subsample[right_temporal_chain].values,
-                df_spectrogram_subsample[left_parasagittal_chain].values,
-                df_spectrogram_subsample[right_parasagittal_chain].values
-            ], axis=-1)
+            if channels:
+                spectrogram = np.stack([
+                    df_spectrogram_subsample[left_temporal_chain].values,
+                    df_spectrogram_subsample[right_temporal_chain].values,
+                    df_spectrogram_subsample[left_parasagittal_chain].values,
+                    df_spectrogram_subsample[right_parasagittal_chain].values
+                ], axis=-1).transpose(1, 0, 2)
+            else:
+                spectrogram = df_spectrogram_subsample.values.T
+
             np.save(spectrogram_file_path, spectrogram)
 
     df_metadata = pd.DataFrame(metadata)
