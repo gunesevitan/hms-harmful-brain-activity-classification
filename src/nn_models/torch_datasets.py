@@ -43,13 +43,8 @@ class SpectrogramDataset(Dataset):
             Array of targets
         """
 
-        spectrogram = np.load(self.data_paths[idx]).T
-        spectrogram = np.log1p(spectrogram)
-
-        if self.transforms is not None:
-            spectrogram = self.transforms(image=spectrogram)['image'].float()
-        else:
-            spectrogram = torch.as_tensor(spectrogram, dtype=torch.float)
+        spectrogram = np.load(self.data_paths[idx])
+        #spectrogram = np.log1p(spectrogram)
 
         if self.targets is not None:
             target = self.targets[idx]
@@ -57,10 +52,31 @@ class SpectrogramDataset(Dataset):
         else:
             target = None
 
+        if False:#np.random.rand() < 0.05:
+
+            r = np.random.beta(50, 50)
+
+            x = np.load(np.random.choice(self.data_paths))
+            x = np.log1p(x)
+            spectrogram = (spectrogram * r + x * (1 - r))
+
+            y = self.targets[idx]
+            target = (target * r + y * (1 - r))
+            target_sum = torch.sum(target, dim=-1)
+            target /= target_sum
+
+
+        if self.transforms is not None:
+            spectrogram = self.transforms(image=spectrogram)['image'].float()
+        else:
+            spectrogram = torch.as_tensor(spectrogram, dtype=torch.float)
+
+
+
         return spectrogram, target
 
 
-def prepare_classification_data(df, eeg_dataset_path, spectrogram_dataset_path):
+def prepare_classification_data(df, eeg_dataset_path, spectrogram_dataset_path, eeg_spectrogram_dataset_path):
 
     """
     Prepare data for classification dataset
@@ -99,6 +115,10 @@ def prepare_classification_data(df, eeg_dataset_path, spectrogram_dataset_path):
     df['spectrogram_path'] = df['spectrogram_file_name'].apply(lambda x: str(spectrogram_dataset_path) + '/spectrograms/' + x)
     spectrogram_paths = df['spectrogram_path'].values
 
+    df['eeg_spectrogram_file_name'] = df['eeg_id'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
+    df['eeg_spectrogram_path'] = df['eeg_spectrogram_file_name'].apply(lambda x: str(eeg_spectrogram_dataset_path) + '/spectrograms/' + x)
+    eeg_spectrogram_paths = df['eeg_spectrogram_path'].values
+
     target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
     targets = df[target_columns].values
     target_classes = df['expert_consensus'].map({
@@ -110,4 +130,4 @@ def prepare_classification_data(df, eeg_dataset_path, spectrogram_dataset_path):
         'Other': 5
     }).values
 
-    return eeg_paths, spectrogram_paths, targets, target_classes
+    return eeg_paths, spectrogram_paths, eeg_spectrogram_paths, targets, target_classes

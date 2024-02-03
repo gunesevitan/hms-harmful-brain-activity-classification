@@ -221,6 +221,7 @@ if __name__ == '__main__':
     dataset_type = config['dataset']['dataset_type']
     eeg_dataset_path = settings.DATA / config['dataset']['eeg_dataset']
     spectrogram_dataset_path = settings.DATA / config['dataset']['spectrogram_dataset']
+    eeg_spectrogram_dataset_path = settings.DATA / config['dataset']['eeg_spectrogram_dataset']
     normalize_targets = config['dataset']['normalize_targets']
     top_n_samples = config['dataset']['top_n_samples']
 
@@ -262,19 +263,29 @@ if __name__ == '__main__':
             if len(validation_idx) == 0:
                 validation_idx = training_idx
 
+            head_idx = df.groupby('eeg_id').head(1).index
+
+            #condition = (df['eeg_label_offset_seconds_diff'] < 10) & (df['expert_consensus_encoded_diff'] != 0)
+            #df['std'] = df[target_columns].std(axis=1)
+            #condition = (df['std'] < 0.3) & (df['std'] > 0.2)
+            #training_idx = training_idx.intersection(np.where(condition)[0])
+            #training_idx = training_idx.intersection(head_idx)
+
             condition = ~(df['eeg_label_offset_seconds_diff'] < 10) & (df['expert_consensus_encoded_diff'] != 0)
             training_idx = training_idx.intersection(np.where(condition)[0])
 
             # Create training and validation inputs and targets
-            training_eeg_paths, training_spectrogram_paths, training_targets, _ = torch_datasets.prepare_classification_data(
+            training_eeg_paths, training_spectrogram_paths, training_eeg_spectrogram_paths, training_targets, _ = torch_datasets.prepare_classification_data(
                 df.loc[training_idx],
                 eeg_dataset_path=eeg_dataset_path,
-                spectrogram_dataset_path=spectrogram_dataset_path
+                spectrogram_dataset_path=spectrogram_dataset_path,
+                eeg_spectrogram_dataset_path=eeg_spectrogram_dataset_path
             )
-            validation_eeg_paths, validation_spectrogram_paths, validation_targets, _ = torch_datasets.prepare_classification_data(
+            validation_eeg_paths, validation_spectrogram_paths, validation_eeg_spectrogram_paths, validation_targets, _ = torch_datasets.prepare_classification_data(
                 df=df.loc[validation_idx],
                 eeg_dataset_path=eeg_dataset_path,
-                spectrogram_dataset_path=spectrogram_dataset_path
+                spectrogram_dataset_path=spectrogram_dataset_path,
+                eeg_spectrogram_dataset_path=eeg_spectrogram_dataset_path
             )
 
             if dataset_type == 'eeg':
@@ -284,6 +295,10 @@ if __name__ == '__main__':
             elif dataset_type == 'spectrogram':
                 training_data_paths = training_spectrogram_paths
                 validation_data_paths = validation_spectrogram_paths
+                dataset_class = torch_datasets.SpectrogramDataset
+            elif dataset_type == 'eeg_spectrogram':
+                training_data_paths = training_eeg_spectrogram_paths
+                validation_data_paths = validation_eeg_spectrogram_paths
                 dataset_class = torch_datasets.SpectrogramDataset
             else:
                 raise ValueError(f'Invalid dataset type {dataset_type}')
@@ -446,7 +461,7 @@ if __name__ == '__main__':
             validation_idx = df.loc[df[fold] == 1].index
 
             # Create validation inputs and targets
-            validation_eeg_paths, validation_spectrogram_paths, validation_targets = torch_datasets.prepare_classification_data(
+            validation_eeg_paths, validation_spectrogram_paths, validation_targets, _ = torch_datasets.prepare_classification_data(
                 df=df.loc[validation_idx],
                 eeg_dataset_path=eeg_dataset_path,
                 spectrogram_dataset_path=spectrogram_dataset_path
