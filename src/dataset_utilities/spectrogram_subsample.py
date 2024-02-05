@@ -77,6 +77,24 @@ if __name__ == '__main__':
             spectrogram_sub_id = row['spectrogram_sub_id']
             start_time = int(row['spectrogram_label_offset_seconds'])
 
+            if start_time % 2 == 0:
+                start_time += 1
+            end_time = start_time + 598
+
+            df_spectrogram_subsample = df_spectrogram.loc[(df_spectrogram['time'] >= start_time) & (df_spectrogram['time'] <= end_time)].iloc[:, 1:]
+
+            nan_counts = df_spectrogram_subsample.isnull().sum().to_dict()
+            nan_counts = {f'{k}_nan_count': v for k, v in nan_counts.items()}
+
+            metadata_dict = {
+                'spectrogram_id': spectrogram_id,
+                'spectrogram_sub_id': spectrogram_sub_id,
+                'row_count': df_spectrogram_subsample.shape[0],
+                'column_count': df_spectrogram_subsample.shape[1]
+            }
+            metadata_dict.update(nan_counts)
+            metadata.append(metadata_dict)
+
             spectrogram = get_spectrogram(df_spectrogram, start_time, fill_na=True, log_scale=False)
             spectrogram_file_path = dataset_directory / 'spectrograms' / f'{spectrogram_id}_{spectrogram_sub_id}.npy'
             np.save(spectrogram_file_path, spectrogram)
