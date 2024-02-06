@@ -22,13 +22,14 @@ if __name__ == '__main__':
 
         spectrogram_file_path = dataset_directory / file_name
         spectrogram = np.load(spectrogram_file_path)
+        spectrogram = np.log1p(spectrogram)
 
         if np.isnan(spectrogram).any():
             continue
 
         sample_count += spectrogram.shape[0]
-        signal_sum += np.sum(spectrogram, axis=(0, 1))
-        signal_squared_sum += np.sum(spectrogram ** 2, axis=(0, 1))
+        signal_sum += np.nansum(spectrogram, axis=(0, 1))
+        signal_squared_sum += np.nansum(spectrogram ** 2, axis=(0, 1))
 
     mean = signal_sum / sample_count
     var = (signal_squared_sum / sample_count) - (mean ** 2)
