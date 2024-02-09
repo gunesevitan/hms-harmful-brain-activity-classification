@@ -20,7 +20,7 @@ def visualize_categorical_column_distribution(df, column, title, path=None):
     title: str
         Title of the plot
 
-    path: path-like str or None
+    path: str, pathlib.Path or None
         Path of the output file or None (if path is None, plot is displayed with selected backend)
     """
 
@@ -66,7 +66,7 @@ def visualize_continuous_column_distribution(df, column, title, path=None):
     title: str
         Title of the plot
 
-    path: path-like str or None
+    path: str, pathlib.Path or None
         Path of the output file or None (if path is None, plot is displayed with selected backend)
     """
 
@@ -113,7 +113,7 @@ def visualize_learning_curve(training_losses, validation_losses, best_epoch, val
     validation_scores: list of shape (n_scores, n_epochs)
         List of multiple validation scores
 
-    path: str or None
+    path: str, pathlib.Path or None
         Path of the output file (if path is None, plot is displayed with selected backend)
     """
 
@@ -177,7 +177,7 @@ def visualize_scores(df_scores, title, path=None):
     title: str
         Title of the plot
 
-    path: path-like str or None
+    path: str, pathlib.Path or None
         Path of the output file or None (if path is None, plot is displayed with selected backend)
     """
 
@@ -232,7 +232,7 @@ def visualize_predictions(y_true, y_pred, title, path=None):
     title: str
         Title of the plot
 
-    path: path-like str or None
+    path: str, pathlib.Path or None
         Path of the output file or None (if path is None, plot is displayed with selected backend)
     """
 
@@ -267,7 +267,7 @@ def visualize_confusion_matrix(y_true, y_pred, title, path=None):
     title: str
         Title of the plot
 
-    path: path-like str or None
+    path: str, pathlib.Path or None
         Path of the output file or None (if path is None, plot is displayed with selected backend)
     """
 
@@ -296,8 +296,3 @@ def visualize_confusion_matrix(y_true, y_pred, title, path=None):
     else:
         plt.savefig(path)
         plt.close(fig)
-
-
-def visualize_spectrogram(spectrogram):
-
-    pass
