@@ -52,3 +52,31 @@ def encode_target(df):
     }).astype(np.uint8)
 
     return df
+
+
+def extract_sample_quality(df, target_columns):
+
+    """
+    Extract sample quality from target columns
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Dataframe with given target columns
+
+    target_columns: list
+        List of names of target columns
+
+    Returns
+    -------
+    df: pd.DataFrame
+        Dataframe with sample quality column
+    """
+
+    df['total_vote'] = df[target_columns].sum(axis=1)
+    df['sample_quality'] = 0
+    df.loc[(df['total_vote'] >= 3) & (df['total_vote'] < 10), 'sample_quality'] = 1
+    df.loc[(df['total_vote'] >= 10), 'sample_quality'] = 2
+    df['sample_quality'] = df['sample_quality'].astype(np.uint8)
+
+    return df
