@@ -1,16 +1,20 @@
+from glob import glob
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 
 class EEGDataset(Dataset):
 
-    def __init__(self, eeg_paths, targets, target_classes, transforms=None):
+    def __init__(self, eeg_paths, targets, target_classes, sample_qualities, transforms=None, random_stationary_period_subsample=0.):
 
         self.eeg_paths = eeg_paths
         self.targets = targets
         self.target_classes = target_classes
+        self.sample_qualities = sample_qualities
         self.transforms = transforms
+        self.random_stationary_period_subsample = random_stationary_period_subsample
 
     def __len__(self):
 
@@ -47,7 +51,21 @@ class EEGDataset(Dataset):
             Tensor of encoded target
         """
 
-        eeg = np.load(self.eeg_paths[idx])
+        if np.random.rand() < self.random_stationary_period_subsample:
+            current_eeg_path = self.eeg_paths[idx]
+            eeg_id_path = '_'.join(current_eeg_path.split('_')[:2])
+            stationary_period_eeg_paths = glob(f'{eeg_id_path}*')
+            stationary_period_eeg_paths = [path for path in stationary_period_eeg_paths if path != current_eeg_path]
+            if len(stationary_period_eeg_paths) > 1:
+                eeg_path = np.random.choice(stationary_period_eeg_paths)
+            else:
+                eeg_path = current_eeg_path
+        else:
+            eeg_path = self.eeg_paths[idx]
+
+        eeg = np.load(eeg_path)
+        eeg = pd.DataFrame(eeg).interpolate(method='linear', limit_area='inside')
+        eeg = eeg.fillna(0).values
 
         if self.targets is not None:
             targets = self.targets[idx]
@@ -61,15 +79,21 @@ class EEGDataset(Dataset):
         else:
             target_class = None
 
+        if self.sample_qualities is not None:
+            sample_quality = self.sample_qualities[idx]
+            sample_quality = torch.as_tensor(sample_quality, dtype=torch.uint8)
+        else:
+            sample_quality = None
+
         if self.transforms is not None:
             eeg = self.transforms(image=eeg)['image'].float()
         else:
             eeg = torch.as_tensor(eeg, dtype=torch.float)
 
-        return eeg, targets, target_class
+        return eeg, targets, target_class, sample_quality
 
 
-def prepare_classification_data(df, eeg_dataset_path):
+def prepare_data(df, eeg_dataset_path):
 
     """
     Prepare data for EEG dataset
@@ -92,6 +116,9 @@ def prepare_classification_data(df, eeg_dataset_path):
 
     target_classes: numpy.ndarray of shape (n_samples)
         Array of target classes
+
+    sample_qualities: numpy.ndarray of shape (n_samples)
+        Array of sample qualities
     """
 
     df['eeg_file_name'] = df['eeg_id'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
@@ -100,13 +127,14 @@ def prepare_classification_data(df, eeg_dataset_path):
 
     target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
     targets = df[target_columns].values
-    target_classes = df['expert_consensus'].map({
+    target_classes = pd.get_dummies(df['expert_consensus'].map({
         'Seizure': 0,
         'LPD': 1,
         'GPD': 2,
         'LRDA': 3,
         'GRDA': 4,
         'Other': 5
-    }).values
+    })).astype(np.uint8).values
+    sample_qualities = df['sample_quality'].values
 
-    return eeg_paths, targets, target_classes
+    return eeg_paths, targets, target_classes, sample_qualities
