@@ -7,14 +7,14 @@ from torch.utils.data import Dataset
 
 class EEGDataset(Dataset):
 
-    def __init__(self, eeg_paths, targets, target_classes, sample_qualities, transforms=None, random_stationary_period_subsample=0.):
+    def __init__(self, eeg_paths, targets, target_classes, sample_qualities, transforms=None, stationary_period_random_subsample=0.):
 
         self.eeg_paths = eeg_paths
         self.targets = targets
         self.target_classes = target_classes
         self.sample_qualities = sample_qualities
         self.transforms = transforms
-        self.random_stationary_period_subsample = random_stationary_period_subsample
+        self.stationary_period_random_subsample = stationary_period_random_subsample
 
     def __len__(self):
 
@@ -51,7 +51,7 @@ class EEGDataset(Dataset):
             Tensor of encoded target
         """
 
-        if np.random.rand() < self.random_stationary_period_subsample:
+        if np.random.rand() < self.stationary_period_random_subsample:
             current_eeg_path = self.eeg_paths[idx]
             eeg_id_path = '_'.join(current_eeg_path.split('_')[:2])
             stationary_period_eeg_paths = glob(f'{eeg_id_path}*')
