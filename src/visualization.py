@@ -94,68 +94,42 @@ def visualize_continuous_column_distribution(df, column, title, path=None):
         plt.close(fig)
 
 
-def visualize_learning_curve(training_losses, validation_losses, best_epoch, validation_scores=None, path=None):
+def visualize_learning_curve(training_scores, validation_scores, best_epoch, metric, path=None):
 
     """
     Visualize learning curves of the models
 
     Parameters
     ----------
-    training_losses: list of shape (n_epochs)
-        List of training losses
+    training_scores: list of shape (n_epochs)
+        List of training losses or scores
 
-    validation_losses: list of shape (n_epochs)
-        List of validation losses
+    validation_scores: list of shape (n_epochs)
+        List of validation losses or scores
 
     best_epoch: int or None
-        Epoch with the best validation loss
+        Epoch with the best validation loss or score
 
-    validation_scores: list of shape (n_scores, n_epochs)
-        List of multiple validation scores
+    metric: str
+        Name of the metric
 
     path: str, pathlib.Path or None
         Path of the output file (if path is None, plot is displayed with selected backend)
     """
 
-    if validation_scores is not None:
+    fig, ax = plt.subplots(figsize=(18, 8), dpi=100)
+    ax.plot(np.arange(1, len(training_scores) + 1), training_scores, '-o', linewidth=2, label=f'Training {metric} (best: {training_scores[best_epoch]:.4f})')
+    ax.plot(np.arange(1, len(validation_scores) + 1), validation_scores, '-o', linewidth=2, label=f'Validation {metric} (best: {validation_scores[best_epoch]:.4f})')
+    ax.axvline(best_epoch + 1, color='r', label=f'Best Epoch: {best_epoch + 1}')
 
-        fig, axes = plt.subplots(figsize=(18, 18), nrows=2, dpi=100)
-        axes[0].plot(np.arange(1, len(training_losses) + 1), training_losses, '-o', linewidth=2, label=f'training_loss (best: {training_losses[best_epoch]:.4f})')
-        axes[0].plot(np.arange(1, len(validation_losses) + 1), validation_losses, '-o', linewidth=2, label=f'validation_loss (best: {validation_losses[best_epoch]:.4f})')
-        axes[0].axvline(best_epoch + 1, color='r', label=f'Best Epoch: {best_epoch + 1}')
+    ax.set_xlabel('Epochs/Steps', size=15, labelpad=12.5)
+    ax.set_ylabel('Losses/Metrics', size=15, labelpad=12.5)
+    ax.set_xticks(np.arange(1, len(validation_scores) + 1), np.arange(1, len(validation_scores) + 1))
 
-        if validation_scores is not None:
-            for metric, scores in validation_scores.items():
-                axes[1].plot(np.arange(1, len(scores) + 1), scores, '-o', linewidth=2, label=f'{metric} (best: {scores[best_epoch]:.4f})')
-
-            axes[1].axvline(best_epoch + 1, color='r', label=f'Best Epoch: {best_epoch + 1}')
-
-        for i in range(2):
-            axes[i].set_xlabel('Epochs/Steps', size=15, labelpad=12.5)
-            axes[i].set_ylabel('Losses/Metrics', size=15, labelpad=12.5)
-            axes[i].set_xticks(np.arange(1, len(validation_losses) + 1), np.arange(1, len(validation_losses) + 1))
-
-            axes[i].tick_params(axis='x', labelsize=12.5, pad=10)
-            axes[i].tick_params(axis='y', labelsize=12.5, pad=10)
-            axes[i].legend(prop={'size': 18})
-
-        axes[0].set_title('Learning Curve (Losses)', size=20, pad=15)
-        axes[0].set_title('Learning Curve (Metrics)', size=20, pad=15)
-
-    else:
-        fig, ax = plt.subplots(figsize=(18, 8), dpi=100)
-        ax.plot(np.arange(1, len(training_losses) + 1), training_losses, '-o', linewidth=2, label=f'training_loss (best: {training_losses[best_epoch]:.4f})')
-        ax.plot(np.arange(1, len(validation_losses) + 1), validation_losses, '-o', linewidth=2, label=f'validation_loss (best: {validation_losses[best_epoch]:.4f})')
-        ax.axvline(best_epoch + 1, color='r', label=f'Best Epoch: {best_epoch + 1}')
-
-        ax.set_xlabel('Epochs/Steps', size=15, labelpad=12.5)
-        ax.set_ylabel('Losses/Metrics', size=15, labelpad=12.5)
-        ax.set_xticks(np.arange(1, len(validation_losses) + 1), np.arange(1, len(validation_losses) + 1))
-
-        ax.tick_params(axis='x', labelsize=12.5, pad=10)
-        ax.tick_params(axis='y', labelsize=12.5, pad=10)
-        ax.legend(prop={'size': 18})
-        ax.set_title('Learning Curve (Losses)', size=20, pad=15)
+    ax.tick_params(axis='x', labelsize=12.5, pad=10)
+    ax.tick_params(axis='y', labelsize=12.5, pad=10)
+    ax.legend(prop={'size': 18})
+    ax.set_title(f'{metric} Learning Curve', size=20, pad=15)
 
     if path is None:
         plt.show()
