@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.metrics import (
-    log_loss, accuracy_score, precision_score, recall_score, f1_score
+    log_loss, accuracy_score
 )
 
 
@@ -71,13 +71,7 @@ def multiclass_classification_scores(df_targets, df_predictions):
     scores = {
         'kl_divergence': float(kl_divergence(df_targets, df_predictions)),
         'log_loss': float(log_loss(predictions_class, df_predictions)),
-        'accuracy': float(accuracy_score(predictions_class, targets_class)),
-        'micro_precision': float(precision_score(predictions_class, targets_class, average='micro')),
-        'macro_precision': float(precision_score(predictions_class, targets_class, average='macro')),
-        'micro_recall': float(recall_score(predictions_class, targets_class, average='micro')),
-        'macro_recall': float(recall_score(predictions_class, targets_class, average='macro')),
-        'micro_f1': float(f1_score(predictions_class, targets_class, average='micro')),
-        'macro_f1': float(f1_score(predictions_class, targets_class, average='macro')),
+        'accuracy': float(accuracy_score(predictions_class, targets_class))
     }
 
     return scores
