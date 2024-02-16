@@ -292,9 +292,16 @@ if __name__ == '__main__':
 
     torch.multiprocessing.set_sharing_strategy('file_system')
 
+    input_dimensions = config['training']['input_dimensions']
+    if input_dimensions == 1:
+        dataset_transforms = transforms.get_raw_eeg_1d_transforms(**config['transforms'])
+    elif input_dimensions == 2:
+        dataset_transforms = transforms.get_raw_eeg_2d_transforms(**config['transforms'])
+    else:
+        raise ValueError(f'Invalid input dimensions {input_dimensions}')
+
     if args.mode == 'training':
 
-        dataset_transforms = transforms.get_eeg_transforms(**config['transforms'])
         training_metadata = defaultdict(dict)
 
         for fold in config['training']['folds']:
@@ -304,7 +311,8 @@ if __name__ == '__main__':
             if len(validation_idx) == 0:
                 validation_idx = training_idx
 
-            sample_quality_idx = np.where(df['sample_quality'] == 2)[0]
+            training_sample_qualities = config['training']['training_sample_qualities']
+            sample_quality_idx = np.where(df['sample_quality'].isin(training_sample_qualities))[0]
             training_idx = training_idx.intersection(sample_quality_idx)
 
             # Create training and validation inputs and targets
@@ -332,7 +340,7 @@ if __name__ == '__main__':
                 target_classes=training_target_classes,
                 sample_qualities=training_sample_qualities,
                 transforms=dataset_transforms['training'],
-                random_stationary_period_subsample=config['transforms']['random_stationary_period_subsample']
+                stationary_period_random_subsample=config['transforms']['stationary_period_random_subsample']
             )
             training_loader = DataLoader(
                 training_dataset,
@@ -348,7 +356,7 @@ if __name__ == '__main__':
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
                 transforms=dataset_transforms['inference'],
-                random_stationary_period_subsample=0.0
+                stationary_period_random_subsample=0.0
             )
             validation_loader = DataLoader(
                 validation_dataset,
@@ -471,9 +479,7 @@ if __name__ == '__main__':
 
     elif args.mode == 'test':
 
-        dataset_transforms = transforms.get_eeg_transforms(**config['transforms'])
         df_scores = []
-
         prediction_columns = [f'{column}_prediction' for column in target_columns]
 
         folds = config['test']['folds']
@@ -503,7 +509,7 @@ if __name__ == '__main__':
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
                 transforms=dataset_transforms['inference'],
-                random_stationary_period_subsample=0.0
+                stationary_period_random_subsample=0.0
             )
             validation_loader = DataLoader(
                 validation_dataset,
