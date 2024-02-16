@@ -1,31 +1,29 @@
 dataset:
-  dataset_type: 'eeg_spectrogram'
   eeg_dataset: 'eeg_subsample'
-  spectrogram_dataset: 'spectrogram_subsample'
-  eeg_spectrogram_dataset: 'eeg_spectrograms'
   normalize_targets: True
-  top_n_samples: 2
 
 model:
-  model_class: 'EfficientNetClassificationModel'
+  model_class: 'EfficientNet'
   model_args:
     model_name: 'efficientnetv2_rw_t'
     pretrained: True
     backbone_args:
-      in_chans: 4
+      in_chans: 1
       drop_rate: 0.1
       drop_path_rate: 0.1
     pooling_type: 'avg'
-    dropout_rate: 0
-    freeze_parameters: False
+    dropout_rate: 0.
     head_args:
       output_dimensions: 6
   model_checkpoint_path: null
 
+
 training:
-  folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
-  #folds: ['fold4', 'fold5']
-  loss_function: 'KLDivWithLogitsLoss'
+  #folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
+  folds: ['fold1', 'fold2', 'fold3', 'fold4',]
+  training_sample_qualities: [2]
+  input_dimensions: 2
+  loss_function: 'BCEWithLogitsLoss'
   loss_function_args: {}
   training_batch_size: 64
   test_batch_size: 128
@@ -33,47 +31,43 @@ training:
   random_state: 42
   deterministic_cudnn: False
   device: 'cuda'
+  task_type: 'binary'
   optimizer: 'AdamW'
   optimizer_args:
     lr: 0.0005
     betas: [0.9, 0.999]
-    weight_decay: 0.00001
-  lr_scheduler: 'StepLR'
+    weight_decay: 0.0001
+  lr_scheduler: 'CosineAnnealingLR'
   lr_scheduler_args:
-    gamma: 1.0
-    step_size: 1000000000
+    T_max: 500
+    eta_min: 0.0001
     last_epoch: -1
-    verbose: False
   amp: True
-  epochs: 10
-  early_stopping_patience: 999
+  epochs: 30
+  early_stopping_metric: 'kl_divergence'
+  early_stopping_patience: 0
 
 test:
   folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
-  model_file_names: ['model_fold1_best.pt', 'model_fold2_best.pt', 'model_fold3_best.pt', 'model_fold4_best.pt', 'model_fold5_best.pt']
-  #folds: ['fold5']
-  #model_file_names: ['model_fold5_best.pt']
+  model_file_names: [
+    'model_fold_1_epoch_8_best_sq_2_kl_divergence_0.4371.pt',
+    'model_fold_2_epoch_19_best_sq_2_kl_divergence_0.3866.pt',
+    'model_fold_3_epoch_19_best_sq_2_kl_divergence_0.4017.pt',
+    'model_fold_4_epoch_30_best_sq_2_kl_divergence_0.4083.pt',
+    'model_fold_5_epoch_19_best_sq_2_kl_divergence_0.4585.pt'
+  ]
   tta: True
-  tta_flip_dimensions: [[2], [3], [2, 3]]
+  tta_flip_dimensions: [[1], [2], [1, 2]]
 
 transforms:
-    crop_height: 400
-    crop_width: 288
-    resize_height: 400
-    resize_width: 300
-    horizontal_flip_probability: 0.5
+    stationary_period_random_subsample: 1.0
     vertical_flip_probability: 0.5
-    brightness_limit: 0.2
-    contrast_limit: 0.2
-    random_brightness_contrast_probability: 0.25
-    n_frequencies: 8
-    n_consecutive: 0
-    frequency_dropout_probability: 0.1
-    center_n_time_steps: 1
-    center_10_second_dropout_probability: 0.1
-    safe_n_time_steps: 4
-    safe_time_dropout_probability: 0.0
+    horizontal_flip_probability: 0.5
+    center_temporal_dropout_time_steps: 200
+    center_temporal_dropout_probability: 0.2
+    non_center_temporal_dropout_time_steps: 1000
+    non_center_temporal_dropout_probability: 0.1
 
 persistence:
-  model_directory: experiment
-  save_epoch_model: []
+  save_best_metrics: ['sq_2_kl_divergence', 'kl_divergence']
+  save_epochs: []
