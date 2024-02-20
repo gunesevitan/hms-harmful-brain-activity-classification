@@ -5,13 +5,16 @@ import torch
 import albumentations as A
 from albumentations import ImageOnlyTransform
 from albumentations.pytorch import ToTensorV2
+from sklearn.preprocessing import RobustScaler
 
 
 class ChannelDifference(ImageOnlyTransform):
 
-    def __init__(self, always_apply=True, p=1.0):
+    def __init__(self, ekg, always_apply=True, p=1.0):
 
         super(ChannelDifference, self).__init__(always_apply=always_apply, p=p)
+
+        self.ekg = ekg
 
     def apply(self, inputs, **kwargs):
 
@@ -29,7 +32,8 @@ class ChannelDifference(ImageOnlyTransform):
             Inputs array with difference features
         """
 
-        inputs_difference = np.zeros((inputs.shape[0], 19))
+        n_channels = 19 if self.ekg else 18
+        inputs_difference = np.zeros((inputs.shape[0], n_channels))
 
         inputs_difference[:, 0] = inputs[:, 0] - inputs[:, 4]
         inputs_difference[:, 1] = inputs[:, 4] - inputs[:, 5]
@@ -54,7 +58,8 @@ class ChannelDifference(ImageOnlyTransform):
         inputs_difference[:, 16] = inputs[:, 8] - inputs[:, 9]
         inputs_difference[:, 17] = inputs[:, 9] - inputs[:, 10]
 
-        inputs_difference[:, 18] = inputs[:, 19]
+        if self.ekg:
+            inputs_difference[:, 18] = inputs[:, 19]
 
         return inputs_difference
 
@@ -130,6 +135,9 @@ class InstanceNormalization2D(ImageOnlyTransform):
         std = np.std(inputs, axis=axis)
         inputs = (inputs - mean) / (std + self.epsilon)
 
+        #s = RobustScaler(quantile_range=(5, 95))
+        #inputs = s.fit_transform(inputs.reshape(-1, 1)).reshape(360, 500)
+
         return inputs
 
 
@@ -157,8 +165,7 @@ class SignalFilter(ImageOnlyTransform):
             Filtered inputs array
         """
 
-        inputs = scipy.signal.sosfilt(self.filter, inputs).astype(np.float32)
-
+        inputs = scipy.signal.sosfilt(self.filter, inputs, axis=0).astype(np.float32)
         return inputs
 
 
@@ -290,6 +297,7 @@ class EEGToImage(ImageOnlyTransform):
         """
 
         inputs = inputs.T
+
         image = []
 
         for i in range(18):
@@ -345,8 +353,7 @@ def get_raw_eeg_1d_transforms(**transform_parameters):
     """
 
     training_transforms = A.Compose([
-        ChannelDifference(always_apply=True),
-        SignalFilter(always_apply=True),
+        ChannelDifference(ekg=True, always_apply=True),
         A.VerticalFlip(p=transform_parameters['vertical_flip_probability']),
         A.HorizontalFlip(p=transform_parameters['horizontal_flip_probability']),
         CenterTemporalDropout1D(
@@ -364,8 +371,7 @@ def get_raw_eeg_1d_transforms(**transform_parameters):
     ])
 
     inference_transforms = A.Compose([
-        ChannelDifference(always_apply=True),
-        SignalFilter(always_apply=True),
+        ChannelDifference(ekg=True, always_apply=True),
         InstanceNormalization1D(per_channel=True, always_apply=True),
         ToTensor1D(always_apply=True)
     ])
@@ -391,22 +397,35 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
     """
 
     training_transforms = A.Compose([
-        ChannelDifference(always_apply=True),
-        SignalFilter(always_apply=True),
-        A.VerticalFlip(p=transform_parameters['vertical_flip_probability']),
-        A.HorizontalFlip(p=transform_parameters['horizontal_flip_probability']),
+        ChannelDifference(ekg=False, always_apply=True),
+        CenterTemporalDropout1D(
+            n_time_steps=transform_parameters['center_temporal_dropout_time_steps'],
+            drop_value=0,
+            p=transform_parameters['center_temporal_dropout_probability']
+        ),
+        A.CoarseDropout(
+            max_holes=transform_parameters['coarse_dropout_max_holes'],
+            min_holes=transform_parameters['coarse_dropout_min_holes'],
+            max_height=transform_parameters['coarse_dropout_max_height'],
+            max_width=transform_parameters['coarse_dropout_max_width'],
+            min_height=transform_parameters['coarse_dropout_min_height'],
+            min_width=transform_parameters['coarse_dropout_min_width'],
+            fill_value=0,
+            p=transform_parameters['coarse_dropout_probability']
+        ),
         InstanceNormalization2D(per_channel=True, always_apply=True),
         EEGToImage(always_apply=True),
-        A.Resize(height=384, width=512, interpolation=cv2.INTER_NEAREST),
+        A.VerticalFlip(p=transform_parameters['vertical_flip_probability']),
+        A.HorizontalFlip(p=transform_parameters['horizontal_flip_probability']),
+        A.PadIfNeeded(min_height=384, min_width=512, border_mode=cv2.BORDER_CONSTANT, value=0),
         ToTensorV2(always_apply=True)
     ])
 
     inference_transforms = A.Compose([
-        ChannelDifference(always_apply=True),
-        SignalFilter(always_apply=True),
+        ChannelDifference(ekg=False, always_apply=True),
         InstanceNormalization2D(per_channel=True, always_apply=True),
         EEGToImage(always_apply=True),
-        A.Resize(height=384, width=512, interpolation=cv2.INTER_NEAREST),
+        A.PadIfNeeded(min_height=384, min_width=512, border_mode=cv2.BORDER_CONSTANT, value=0),
         ToTensorV2(always_apply=True)
     ])
 
