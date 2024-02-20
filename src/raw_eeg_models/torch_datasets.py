@@ -7,14 +7,23 @@ from torch.utils.data import Dataset
 
 class EEGDataset(Dataset):
 
-    def __init__(self, eeg_paths, targets, target_classes, sample_qualities, transforms=None, stationary_period_random_subsample=0.):
+    def __init__(
+            self,
+            eeg_paths, targets, target_classes, sample_qualities,
+            transforms=None,
+            stationary_period_random_subsample_probability=0.,
+            mixup_alpha=2, mixup_probability=0., mixup_center_probability=0.
+    ):
 
         self.eeg_paths = eeg_paths
         self.targets = targets
         self.target_classes = target_classes
         self.sample_qualities = sample_qualities
         self.transforms = transforms
-        self.stationary_period_random_subsample = stationary_period_random_subsample
+        self.stationary_period_random_subsample_probability = stationary_period_random_subsample_probability
+        self.mixup_alpha = mixup_alpha
+        self.mixup_probability = mixup_probability
+        self.mixup_center_probability = mixup_center_probability
 
     def __len__(self):
 
@@ -51,12 +60,17 @@ class EEGDataset(Dataset):
             Tensor of encoded target
         """
 
-        if np.random.rand() < self.stationary_period_random_subsample:
+        if np.random.rand() < self.stationary_period_random_subsample_probability:
+
             current_eeg_path = self.eeg_paths[idx]
+
+            # Extract same stationary period subsample paths from the EEG id
             eeg_id_path = '_'.join(current_eeg_path.split('_')[:2])
             stationary_period_eeg_paths = glob(f'{eeg_id_path}*')
             stationary_period_eeg_paths = [path for path in stationary_period_eeg_paths if path != current_eeg_path]
+
             if len(stationary_period_eeg_paths) > 1:
+                # Randomly select an EEG from the subsample paths
                 eeg_path = np.random.choice(stationary_period_eeg_paths)
             else:
                 eeg_path = current_eeg_path
@@ -81,9 +95,36 @@ class EEGDataset(Dataset):
 
         if self.sample_qualities is not None:
             sample_quality = self.sample_qualities[idx]
-            sample_quality = torch.as_tensor(sample_quality, dtype=torch.uint8)
+            sample_quality = torch.as_tensor(sample_quality, dtype=torch.float)
         else:
             sample_quality = None
+
+        if np.random.rand() < self.mixup_probability:
+
+            # Randomly select from the subsample paths
+            mixup_idx = np.random.randint(0, len(self.eeg_paths))
+
+            mixup_eeg = np.load(self.eeg_paths[mixup_idx])
+            mixup_eeg = pd.DataFrame(mixup_eeg).interpolate(method='linear', limit_area='inside')
+            mixup_eeg = mixup_eeg.fillna(0).values
+
+            # Sample MixUp lambda from beta distribution
+            mixup_lambda = np.clip(np.random.beta(self.mixup_alpha, self.mixup_alpha), a_min=0.4, a_max=0.6)
+            if np.random.rand() < self.mixup_center_probability:
+                # Apply MixUp to center 10 seconds
+                eeg[4000:6000, :] = eeg[4000:6000, :] * mixup_lambda + (1 - mixup_lambda) * mixup_eeg[4000:6000, :]
+            else:
+                # Apply MixUp to entire EEG
+                eeg = eeg * mixup_lambda + (1 - mixup_lambda) * mixup_eeg
+
+            if self.targets is not None:
+                mixup_targets = self.targets[mixup_idx]
+                targets = targets * mixup_lambda + (1 - mixup_lambda) * mixup_targets
+                targets /= targets.sum(dim=-1)
+
+            if self.sample_qualities is not None:
+                mixup_sample_quality = self.sample_qualities[mixup_idx]
+                sample_quality = torch.ceil((sample_quality + mixup_sample_quality) / 2)
 
         if self.transforms is not None:
             eeg = self.transforms(image=eeg)['image'].float()
