@@ -340,7 +340,10 @@ if __name__ == '__main__':
                 target_classes=training_target_classes,
                 sample_qualities=training_sample_qualities,
                 transforms=dataset_transforms['training'],
-                stationary_period_random_subsample=config['transforms']['stationary_period_random_subsample']
+                stationary_period_random_subsample_probability=config['transforms']['stationary_period_random_subsample_probability'],
+                mixup_alpha=config['transforms']['mixup_alpha'],
+                mixup_probability=config['transforms']['mixup_probability'],
+                mixup_center_probability=config['transforms']['mixup_center_probability']
             )
             training_loader = DataLoader(
                 training_dataset,
@@ -356,7 +359,10 @@ if __name__ == '__main__':
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
                 transforms=dataset_transforms['inference'],
-                stationary_period_random_subsample=0.0
+                stationary_period_random_subsample_probability=0.,
+                mixup_alpha=None,
+                mixup_probability=0.,
+                mixup_center_probability=0.,
             )
             validation_loader = DataLoader(
                 validation_dataset,
@@ -374,8 +380,10 @@ if __name__ == '__main__':
             criterion = getattr(torch_modules, config['training']['loss_function'])(**config['training']['loss_function_args'])
 
             model = getattr(torch_modules, config['model']['model_class'])(**config['model']['model_args'])
-            if config['model']['model_checkpoint_path'] is not None:
-                model.load_state_dict(torch.load(config['model']['model_checkpoint_path']), strict=False)
+            model_checkpoint_path = config['model']['model_checkpoint_paths'][int(fold[-1]) - 1]
+            if model_checkpoint_path is not None:
+                model_checkpoint_path = settings.MODELS / model_checkpoint_path
+                model.load_state_dict(torch.load(model_checkpoint_path), strict=False)
             model.to(device)
 
             # Set optimizer, learning rate scheduler and stochastic weight averaging
@@ -509,7 +517,10 @@ if __name__ == '__main__':
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
                 transforms=dataset_transforms['inference'],
-                stationary_period_random_subsample=0.0
+                stationary_period_random_subsample_probability=0.,
+                mixup_alpha=None,
+                mixup_probability=0.,
+                mixup_center_probability=0.,
             )
             validation_loader = DataLoader(
                 validation_dataset,
