@@ -45,6 +45,56 @@ class EfficientNet(nn.Module):
         return output
 
 
+class CoaT(nn.Module):
+
+    def __init__(self, model_name, pretrained, backbone_args, dropout_rate, head_args):
+
+        super(CoaT, self).__init__()
+
+        self.backbone = timm.create_model(
+            model_name=model_name,
+            pretrained=pretrained,
+            **backbone_args
+        )
+
+        input_features = self.backbone.get_classifier().in_features
+        self.backbone.head_drop = nn.Identity()
+        self.backbone.head = nn.Identity()
+        self.dropout = nn.Dropout(dropout_rate) if dropout_rate > 0 else nn.Identity()
+        self.head = ClassificationHead(input_dimensions=input_features, **head_args)
+
+    def forward(self, x):
+
+        x = self.backbone(x)
+        x = self.dropout(x)
+        output = self.head(x)
+
+        return output
+
+
+class MaxViT(nn.Module):
+
+    def __init__(self, model_name, pretrained, backbone_args, dropout_rate, head_args):
+
+        super(MaxViT, self).__init__()
+
+        self.backbone = timm.create_model(
+            model_name=model_name,
+            pretrained=pretrained,
+            **backbone_args
+        )
+
+        input_features = self.backbone.get_classifier().in_features
+        self.backbone.head.drop.p = dropout_rate
+        self.backbone.head.fc = ClassificationHead(input_dimensions=input_features, **head_args)
+
+    def forward(self, x):
+
+        x = self.backbone(x)
+
+        return x
+
+
 def load_timm_model(model_directory, model_file_names, device):
 
     """
