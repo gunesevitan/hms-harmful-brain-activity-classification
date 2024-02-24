@@ -5,7 +5,6 @@ import torch
 import albumentations as A
 from albumentations import ImageOnlyTransform
 from albumentations.pytorch import ToTensorV2
-from sklearn.preprocessing import RobustScaler
 
 
 class ChannelDifference(ImageOnlyTransform):
@@ -19,7 +18,7 @@ class ChannelDifference(ImageOnlyTransform):
     def apply(self, inputs, **kwargs):
 
         """
-        Create difference features
+        Create bipolar channel difference features
 
         Parameters
         ----------
@@ -28,33 +27,38 @@ class ChannelDifference(ImageOnlyTransform):
 
         Returns
         -------
-        inputs: numpy.ndarray of shape (time, 19)
+        inputs: numpy.ndarray of shape (time, 18 or 19)
             Inputs array with difference features
         """
 
         n_channels = 19 if self.ekg else 18
         inputs_difference = np.zeros((inputs.shape[0], n_channels))
 
+        # Left outside temporal chain
         inputs_difference[:, 0] = inputs[:, 0] - inputs[:, 4]
         inputs_difference[:, 1] = inputs[:, 4] - inputs[:, 5]
         inputs_difference[:, 2] = inputs[:, 5] - inputs[:, 6]
         inputs_difference[:, 3] = inputs[:, 6] - inputs[:, 7]
 
+        # Right outside temporal chain
         inputs_difference[:, 4] = inputs[:, 11] - inputs[:, 15]
         inputs_difference[:, 5] = inputs[:, 15] - inputs[:, 16]
         inputs_difference[:, 6] = inputs[:, 16] - inputs[:, 17]
         inputs_difference[:, 7] = inputs[:, 17] - inputs[:, 18]
 
+        # Left inside parasagittal chain
         inputs_difference[:, 8] = inputs[:, 0] - inputs[:, 1]
         inputs_difference[:, 9] = inputs[:, 1] - inputs[:, 2]
         inputs_difference[:, 10] = inputs[:, 2] - inputs[:, 3]
         inputs_difference[:, 11] = inputs[:, 3] - inputs[:, 7]
 
+        # Right inside parasagittal chain
         inputs_difference[:, 12] = inputs[:, 11] - inputs[:, 12]
         inputs_difference[:, 13] = inputs[:, 12] - inputs[:, 13]
         inputs_difference[:, 14] = inputs[:, 13] - inputs[:, 14]
         inputs_difference[:, 15] = inputs[:, 14] - inputs[:, 18]
 
+        # Center chain
         inputs_difference[:, 16] = inputs[:, 8] - inputs[:, 9]
         inputs_difference[:, 17] = inputs[:, 9] - inputs[:, 10]
 
@@ -62,6 +66,51 @@ class ChannelDifference(ImageOnlyTransform):
             inputs_difference[:, 18] = inputs[:, 19]
 
         return inputs_difference
+
+
+class ChannelGroupPermute(ImageOnlyTransform):
+
+    def __init__(self, ekg, always_apply=False, p=0.5):
+
+        super(ChannelGroupPermute, self).__init__(always_apply=always_apply, p=p)
+
+        self.ekg = ekg
+
+    def apply(self, inputs, **kwargs):
+
+        """
+        Create difference features
+
+        Parameters
+        ----------
+        inputs: numpy.ndarray of shape (time, 18 or 19)
+            Inputs array with difference features
+
+        Returns
+        -------
+        inputs_permuted: numpy.ndarray of shape (time, 19)
+            Inputs array with difference features permuted
+        """
+
+        groups = np.array([
+            [0, 1, 2, 3],
+            [4, 5, 6, 7],
+            [8, 9, 10, 11],
+            [12, 13, 14, 15]
+        ])
+        inputs_permuted = np.zeros_like(inputs)
+        for group_idx, permuted_group_idx in enumerate(np.random.permutation(np.arange(len(groups)))):
+            # Permute channel groups of LL, RL, LP and RP chains
+            group = groups[group_idx]
+            permuted_group = groups[permuted_group_idx]
+            inputs_permuted[group] = inputs[permuted_group]
+
+        # Center chain and EKG are not permuted
+        inputs_permuted[:, [16, 17]] = inputs[:, [16, 17]]
+        if self.ekg:
+            inputs_permuted[:, 18] = inputs[:, 18]
+
+        return inputs_permuted
 
 
 class InstanceNormalization1D(ImageOnlyTransform):
@@ -129,14 +178,11 @@ class InstanceNormalization2D(ImageOnlyTransform):
         if self.per_channel:
             axis = (0, 1)
         else:
-            axis = (0, 1)
+            axis = (0, 1, 2)
 
         mean = np.mean(inputs, axis=axis)
         std = np.std(inputs, axis=axis)
         inputs = (inputs - mean) / (std + self.epsilon)
-
-        #s = RobustScaler(quantile_range=(5, 95))
-        #inputs = s.fit_transform(inputs.reshape(-1, 1)).reshape(360, 500)
 
         return inputs
 
@@ -194,7 +240,7 @@ class CenterTemporalDropout1D(ImageOnlyTransform):
             Inputs array with dropped time steps from center 10 seconds
         """
 
-        # Uniformly sample N amount of indices to drop on time axis between center 10 seconds
+        # Uniformly sample N amount of indices to drop on time axis at center 10 seconds
         center_start = 4000
         center_end = 6000
         drop_idx = np.random.choice(np.arange(center_start, center_end + 1), self.n_time_steps, replace=False)
@@ -237,39 +283,6 @@ class NonCenterTemporalDropout1D(ImageOnlyTransform):
             replace=False
         )
         inputs[drop_idx, :] = self.drop_value
-
-        return inputs
-
-
-class RandomGaussianNoise1D(ImageOnlyTransform):
-
-    def __init__(self, mean, std, always_apply=False, p=0.5):
-
-        super(RandomGaussianNoise1D, self).__init__(always_apply=always_apply, p=p)
-
-        self.mean = mean
-        self.std = std
-
-    def apply(self, inputs, **kwargs):
-
-        """
-        Add random noise to channels
-
-        Parameters
-        ----------
-        inputs: numpy.ndarray of shape (time, channel)
-             Inputs array
-
-        Returns
-        -------
-        inputs: numpy.ndarray of shape (time, channel)
-            Inputs array with random noise added
-        """
-
-        for channel_idx in range(inputs.shape[1]):
-            mean = inputs[:, channel_idx].mean() / self.mean
-            std = np.abs(mean / self.std)
-            inputs[:, channel_idx] += np.random.normal(loc=mean, scale=std, size=inputs.shape[0])
 
         return inputs
 
@@ -398,11 +411,18 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
 
     training_transforms = A.Compose([
         ChannelDifference(ekg=False, always_apply=True),
+        ChannelGroupPermute(ekg=False, p=transform_parameters['channel_group_permute_probability']),
         CenterTemporalDropout1D(
             n_time_steps=transform_parameters['center_temporal_dropout_time_steps'],
             drop_value=0,
             p=transform_parameters['center_temporal_dropout_probability']
         ),
+        NonCenterTemporalDropout1D(
+            n_time_steps=transform_parameters['non_center_temporal_dropout_time_steps'],
+            drop_value=0,
+            p=transform_parameters['non_center_temporal_dropout_probability']
+        ),
+        EEGToImage(always_apply=True),
         A.CoarseDropout(
             max_holes=transform_parameters['coarse_dropout_max_holes'],
             min_holes=transform_parameters['coarse_dropout_min_holes'],
@@ -413,19 +433,28 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
             fill_value=0,
             p=transform_parameters['coarse_dropout_probability']
         ),
-        InstanceNormalization2D(per_channel=True, always_apply=True),
-        EEGToImage(always_apply=True),
         A.VerticalFlip(p=transform_parameters['vertical_flip_probability']),
         A.HorizontalFlip(p=transform_parameters['horizontal_flip_probability']),
-        A.PadIfNeeded(min_height=384, min_width=512, border_mode=cv2.BORDER_CONSTANT, value=0),
+        A.PadIfNeeded(
+            min_height=transform_parameters['pad_min_height'],
+            min_width=transform_parameters['pad_min_width'],
+            border_mode=cv2.BORDER_CONSTANT,
+            value=0
+        ),
+        InstanceNormalization2D(per_channel=True, always_apply=True),
         ToTensorV2(always_apply=True)
     ])
 
     inference_transforms = A.Compose([
         ChannelDifference(ekg=False, always_apply=True),
-        InstanceNormalization2D(per_channel=True, always_apply=True),
         EEGToImage(always_apply=True),
-        A.PadIfNeeded(min_height=384, min_width=512, border_mode=cv2.BORDER_CONSTANT, value=0),
+        A.PadIfNeeded(
+            min_height=transform_parameters['pad_min_height'],
+            min_width=transform_parameters['pad_min_width'],
+            border_mode=cv2.BORDER_CONSTANT,
+            value=0
+        ),
+        InstanceNormalization2D(per_channel=True, always_apply=True),
         ToTensorV2(always_apply=True)
     ])
 
