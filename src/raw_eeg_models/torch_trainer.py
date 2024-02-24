@@ -339,11 +339,15 @@ if __name__ == '__main__':
                 targets=training_targets,
                 target_classes=training_target_classes,
                 sample_qualities=training_sample_qualities,
+                interpolate_center=config['transforms']['interpolate_center'],
+                fill_edge_value=config['transforms']['fill_edge_value'],
+                clip_bounds=config['transforms']['clip_bounds'],
                 transforms=dataset_transforms['training'],
                 stationary_period_random_subsample_probability=config['transforms']['stationary_period_random_subsample_probability'],
                 mixup_alpha=config['transforms']['mixup_alpha'],
                 mixup_probability=config['transforms']['mixup_probability'],
-                mixup_center_probability=config['transforms']['mixup_center_probability']
+                mixup_center_probability=config['transforms']['mixup_center_probability'],
+                cutmix_probability=config['transforms']['cutmix_probability'],
             )
             training_loader = DataLoader(
                 training_dataset,
@@ -358,11 +362,15 @@ if __name__ == '__main__':
                 targets=validation_targets,
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
+                interpolate_center=config['transforms']['interpolate_center'],
+                fill_edge_value=config['transforms']['fill_edge_value'],
+                clip_bounds=config['transforms']['clip_bounds'],
                 transforms=dataset_transforms['inference'],
                 stationary_period_random_subsample_probability=0.,
                 mixup_alpha=None,
                 mixup_probability=0.,
                 mixup_center_probability=0.,
+                cutmix_probability=0.
             )
             validation_loader = DataLoader(
                 validation_dataset,
@@ -516,11 +524,15 @@ if __name__ == '__main__':
                 targets=validation_targets,
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
+                interpolate_center=config['transforms']['interpolate_center'],
+                fill_edge_value=config['transforms']['fill_edge_value'],
+                clip_bounds=config['transforms']['clip_bounds'],
                 transforms=dataset_transforms['inference'],
                 stationary_period_random_subsample_probability=0.,
                 mixup_alpha=None,
                 mixup_probability=0.,
                 mixup_center_probability=0.,
+                cutmix_probability=0.
             )
             validation_loader = DataLoader(
                 validation_dataset,
