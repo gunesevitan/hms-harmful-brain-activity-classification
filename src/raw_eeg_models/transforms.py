@@ -7,11 +7,11 @@ from albumentations import ImageOnlyTransform
 from albumentations.pytorch import ToTensorV2
 
 
-class ChannelDifference(ImageOnlyTransform):
+class ChannelDifference1D(ImageOnlyTransform):
 
     def __init__(self, ekg, always_apply=True, p=1.0):
 
-        super(ChannelDifference, self).__init__(always_apply=always_apply, p=p)
+        super(ChannelDifference1D, self).__init__(always_apply=always_apply, p=p)
 
         self.ekg = ekg
 
@@ -68,18 +68,18 @@ class ChannelDifference(ImageOnlyTransform):
         return inputs_difference
 
 
-class ChannelGroupPermute(ImageOnlyTransform):
+class ChannelGroupPermute1D(ImageOnlyTransform):
 
     def __init__(self, ekg, always_apply=False, p=0.5):
 
-        super(ChannelGroupPermute, self).__init__(always_apply=always_apply, p=p)
+        super(ChannelGroupPermute1D, self).__init__(always_apply=always_apply, p=p)
 
         self.ekg = ekg
 
     def apply(self, inputs, **kwargs):
 
         """
-        Create difference features
+        Permute 4 main channel groups
 
         Parameters
         ----------
@@ -88,7 +88,7 @@ class ChannelGroupPermute(ImageOnlyTransform):
 
         Returns
         -------
-        inputs_permuted: numpy.ndarray of shape (time, 19)
+        inputs_permuted: numpy.ndarray of shape (time, 18 or 19)
             Inputs array with difference features permuted
         """
 
@@ -166,12 +166,12 @@ class InstanceNormalization2D(ImageOnlyTransform):
 
         Parameters
         ----------
-        inputs: numpy.ndarray of shape (channel, height, width)
+        inputs: numpy.ndarray of shape (height, width, channel)
              Inputs array
 
         Returns
         -------
-        inputs: numpy.ndarray of shape (channel, height, width)
+        inputs: numpy.ndarray of shape (height, width, channel)
             Normalized inputs array
         """
 
@@ -179,6 +179,43 @@ class InstanceNormalization2D(ImageOnlyTransform):
             axis = (0, 1)
         else:
             axis = (0, 1, 2)
+
+        mean = np.mean(inputs, axis=axis)
+        std = np.std(inputs, axis=axis)
+        inputs = (inputs - mean) / (std + self.epsilon)
+
+        return inputs
+
+
+class InstanceNormalization3D(ImageOnlyTransform):
+
+    def __init__(self, per_channel, epsilon=1e-15, always_apply=True, p=1.0):
+
+        super(InstanceNormalization3D, self).__init__(always_apply=always_apply, p=p)
+
+        self.per_channel = per_channel
+        self.epsilon = epsilon
+
+    def apply(self, inputs, **kwargs):
+
+        """
+        Normalize inputs by mean and standard deviation of itself
+
+        Parameters
+        ----------
+        inputs: numpy.ndarray of shape (depth, height, width, channel)
+             Inputs array
+
+        Returns
+        -------
+        inputs: numpy.ndarray of shape (depth, height, width, channel)
+            Normalized inputs array
+        """
+
+        if self.per_channel:
+            axis = (0, 1, 2)
+        else:
+            axis = (0, 1, 2, 3)
 
         mean = np.mean(inputs, axis=axis)
         std = np.std(inputs, axis=axis)
@@ -198,7 +235,7 @@ class SignalFilter(ImageOnlyTransform):
     def apply(self, inputs, **kwargs):
 
         """
-        Filter inputs
+        Filter inputs signals
 
         Parameters
         ----------
@@ -287,26 +324,26 @@ class NonCenterTemporalDropout1D(ImageOnlyTransform):
         return inputs
 
 
-class EEGToImage(ImageOnlyTransform):
+class EEGTo2D(ImageOnlyTransform):
 
     def __init__(self, always_apply=True, p=1.0):
 
-        super(EEGToImage, self).__init__(always_apply=always_apply, p=p)
+        super(EEGTo2D, self).__init__(always_apply=always_apply, p=p)
 
     def apply(self, inputs, **kwargs):
 
         """
-        Convert 1D EEG to 2D vertically stacked image
+        Convert 1D EEG to vertically stacked 2D
 
         Parameters
         ----------
         inputs: numpy.ndarray of shape (time, channel)
-             1D EEG inputs array
+             1D inputs array
 
         Returns
         -------
         image: numpy.ndarray of shape (height, width)
-            2D image inputs array
+            2D inputs array
         """
 
         inputs = inputs.T
@@ -318,6 +355,50 @@ class EEGToImage(ImageOnlyTransform):
                 image.append(inputs[i, j::20])
 
         image = np.stack(image, axis=0)
+
+        return image
+
+
+class EEGTo3D(ImageOnlyTransform):
+
+    def __init__(self, always_apply=True, p=1.0):
+
+        super(EEGTo3D, self).__init__(always_apply=always_apply, p=p)
+
+    def apply(self, inputs, **kwargs):
+
+        """
+        Convert 1D EEG to 3D vertically and depth stacked
+
+        Parameters
+        ----------
+        inputs: numpy.ndarray of shape (time, channel)
+             1D inputs array
+
+        Returns
+        -------
+        image: numpy.ndarray of shape (depth, height, width)
+            3D inputs array
+        """
+
+        # Horizontally duplicate center chain for symmetrical slices
+        inputs = np.hstack((inputs, inputs[:, [16, 17]]))
+        inputs = inputs.T
+
+        image = []
+
+        for i in range(20):
+            for j in range(20):
+                image.append(inputs[i, j::20])
+
+        image = np.stack(image, axis=0)
+        image = np.stack([
+            image[0:80],
+            image[80:160],
+            image[160:240],
+            image[240:320],
+            image[320:400],
+        ], axis=0)
 
         return image
 
@@ -349,6 +430,34 @@ class ToTensor1D(ImageOnlyTransform):
         return inputs
 
 
+class ToTensor3D(ImageOnlyTransform):
+
+    def __init__(self, always_apply=True, p=1.0):
+
+        super(ToTensor3D, self).__init__(always_apply=always_apply, p=p)
+
+    def apply(self, inputs, **kwargs):
+
+        """
+        Convert inputs array to a torch tensor and add channel dimension
+
+        Parameters
+        ----------
+        inputs: numpy.ndarray of shape (depth, height, width)
+             Inputs array
+
+        Returns
+        -------
+        inputs: torch.Tensor of shape (channel, depth, height, width)
+            Inputs tensor
+        """
+
+        inputs = torch.as_tensor(inputs, dtype=torch.float32)
+        inputs = torch.unsqueeze(inputs, dim=0)
+
+        return inputs
+
+
 def get_raw_eeg_1d_transforms(**transform_parameters):
 
     """
@@ -366,9 +475,8 @@ def get_raw_eeg_1d_transforms(**transform_parameters):
     """
 
     training_transforms = A.Compose([
-        ChannelDifference(ekg=True, always_apply=True),
-        A.VerticalFlip(p=transform_parameters['vertical_flip_probability']),
-        A.HorizontalFlip(p=transform_parameters['horizontal_flip_probability']),
+        ChannelDifference1D(ekg=True, always_apply=True),
+        ChannelGroupPermute1D(ekg=False, p=transform_parameters['channel_group_permute_probability']),
         CenterTemporalDropout1D(
             n_time_steps=transform_parameters['center_temporal_dropout_time_steps'],
             drop_value=0,
@@ -379,12 +487,14 @@ def get_raw_eeg_1d_transforms(**transform_parameters):
             drop_value=0,
             p=transform_parameters['non_center_temporal_dropout_probability']
         ),
+        A.VerticalFlip(p=transform_parameters['vertical_flip_probability']),
+        A.HorizontalFlip(p=transform_parameters['horizontal_flip_probability']),
         InstanceNormalization1D(per_channel=True, always_apply=True),
         ToTensor1D(always_apply=True)
     ])
 
     inference_transforms = A.Compose([
-        ChannelDifference(ekg=True, always_apply=True),
+        ChannelDifference1D(ekg=True, always_apply=True),
         InstanceNormalization1D(per_channel=True, always_apply=True),
         ToTensor1D(always_apply=True)
     ])
@@ -410,8 +520,8 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
     """
 
     training_transforms = A.Compose([
-        ChannelDifference(ekg=False, always_apply=True),
-        ChannelGroupPermute(ekg=False, p=transform_parameters['channel_group_permute_probability']),
+        ChannelDifference1D(ekg=False, always_apply=True),
+        ChannelGroupPermute1D(ekg=False, p=transform_parameters['channel_group_permute_probability']),
         CenterTemporalDropout1D(
             n_time_steps=transform_parameters['center_temporal_dropout_time_steps'],
             drop_value=0,
@@ -422,7 +532,7 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
             drop_value=0,
             p=transform_parameters['non_center_temporal_dropout_probability']
         ),
-        EEGToImage(always_apply=True),
+        EEGTo2D(always_apply=True),
         A.CoarseDropout(
             max_holes=transform_parameters['coarse_dropout_max_holes'],
             min_holes=transform_parameters['coarse_dropout_min_holes'],
@@ -446,8 +556,8 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
     ])
 
     inference_transforms = A.Compose([
-        ChannelDifference(ekg=False, always_apply=True),
-        EEGToImage(always_apply=True),
+        ChannelDifference1D(ekg=False, always_apply=True),
+        EEGTo2D(always_apply=True),
         A.PadIfNeeded(
             min_height=transform_parameters['pad_min_height'],
             min_width=transform_parameters['pad_min_width'],
@@ -456,6 +566,51 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
         ),
         InstanceNormalization2D(per_channel=True, always_apply=True),
         ToTensorV2(always_apply=True)
+    ])
+
+    eeg_transforms = {'training': training_transforms, 'inference': inference_transforms}
+    return eeg_transforms
+
+
+def get_raw_eeg_3d_transforms(**transform_parameters):
+
+    """
+    Get raw EEG 3D transforms for dataset
+
+    Parameters
+    ----------
+    transform_parameters: dict
+        Dictionary of transform parameters
+
+    Returns
+    -------
+    eeg_transforms: dict
+        Transforms for training and inference
+    """
+
+    training_transforms = A.Compose([
+        ChannelDifference1D(ekg=False, always_apply=True),
+        ChannelGroupPermute1D(ekg=False, p=transform_parameters['channel_group_permute_probability']),
+        CenterTemporalDropout1D(
+            n_time_steps=transform_parameters['center_temporal_dropout_time_steps'],
+            drop_value=0,
+            p=transform_parameters['center_temporal_dropout_probability']
+        ),
+        NonCenterTemporalDropout1D(
+            n_time_steps=transform_parameters['non_center_temporal_dropout_time_steps'],
+            drop_value=0,
+            p=transform_parameters['non_center_temporal_dropout_probability']
+        ),
+        EEGTo3D(always_apply=True),
+        InstanceNormalization3D(per_channel=True, always_apply=True),
+        ToTensor3D(always_apply=True)
+    ])
+
+    inference_transforms = A.Compose([
+        ChannelDifference1D(ekg=False, always_apply=True),
+        EEGTo3D(always_apply=True),
+        InstanceNormalization3D(per_channel=True, always_apply=True),
+        ToTensor3D(always_apply=True)
     ])
 
     eeg_transforms = {'training': training_transforms, 'inference': inference_transforms}
