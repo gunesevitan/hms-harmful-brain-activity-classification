@@ -297,6 +297,8 @@ if __name__ == '__main__':
         dataset_transforms = transforms.get_raw_eeg_1d_transforms(**config['transforms'])
     elif input_dimensions == 2:
         dataset_transforms = transforms.get_raw_eeg_2d_transforms(**config['transforms'])
+    elif input_dimensions == 3:
+        dataset_transforms = transforms.get_raw_eeg_3d_transforms(**config['transforms'])
     else:
         raise ValueError(f'Invalid input dimensions {input_dimensions}')
 
