@@ -84,6 +84,8 @@ class CSN(nn.Module):
 
     def forward(self, x):
 
+        x = F.interpolate(x, size=(96, 512), mode='bilinear').unsqueeze(1)
+
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
@@ -104,6 +106,7 @@ class CSNModel(nn.Module):
         super(CSNModel, self).__init__()
 
         self.encoder = CSN(**backbone_args)
+        self.load_weights()
 
         self.pooling_type = pooling_type
         self.dropout = nn.Dropout(dropout_rate) if dropout_rate > 0 else nn.Identity()
@@ -127,3 +130,10 @@ class CSNModel(nn.Module):
         output = self.head(x)
 
         return output
+
+    def load_weights(self):
+
+        ckpt = torch.load('/home/gunes/Desktop/Kaggle/hms-harmful-brain-activity-classification/models/raw_eeg_3d_resnet50csn_5x96x512_quality_01_pretraining/csn50.pth')
+        conv1_weight = ckpt['conv1.weight'].sum(dim=1, keepdim=True)
+        ckpt['conv1.weight'] = conv1_weight
+        self.encoder.load_state_dict(ckpt, strict=True)
