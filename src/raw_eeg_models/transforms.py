@@ -403,6 +403,35 @@ class EEGTo3D(ImageOnlyTransform):
         return image
 
 
+class Flip3D(ImageOnlyTransform):
+
+    def __init__(self, flip_dimension, always_apply=False, p=0.5):
+
+        super(Flip3D, self).__init__(always_apply=always_apply, p=p)
+
+        self.flip_dimension = flip_dimension
+
+    def apply(self, inputs, **kwargs):
+
+        """
+        Flip 3D EEG on given axis
+
+        Parameters
+        ----------
+        inputs: numpy.ndarray of shape (depth, height, width)
+            3D inputs array
+
+        Returns
+        -------
+        inputs: numpy.ndarray of shape (depth, height, width)
+            Flipped 3D inputs array
+        """
+
+        inputs = np.flip(inputs, axis=self.flip_dimension)
+
+        return  inputs
+
+
 class ToTensor1D(ImageOnlyTransform):
 
     def __init__(self, always_apply=True, p=1.0):
@@ -453,7 +482,6 @@ class ToTensor3D(ImageOnlyTransform):
         """
 
         inputs = torch.as_tensor(inputs, dtype=torch.float32)
-        inputs = torch.unsqueeze(inputs, dim=0)
 
         return inputs
 
@@ -602,6 +630,9 @@ def get_raw_eeg_3d_transforms(**transform_parameters):
             p=transform_parameters['non_center_temporal_dropout_probability']
         ),
         EEGTo3D(always_apply=True),
+        Flip3D(flip_dimension=0, p=transform_parameters['horizontal_flip_probability']),
+        Flip3D(flip_dimension=1, p=transform_parameters['vertical_flip_probability']),
+        Flip3D(flip_dimension=2, p=transform_parameters['depth_flip_probability']),
         InstanceNormalization3D(per_channel=True, always_apply=True),
         ToTensor3D(always_apply=True)
     ])
