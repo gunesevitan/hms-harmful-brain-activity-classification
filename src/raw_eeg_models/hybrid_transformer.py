@@ -10,7 +10,7 @@ def positional_encoding(length, embed_dim):
     dim = embed_dim // 2
 
     position = np.arange(length)[:, np.newaxis]
-    dim = np.arange(dim)[np.newaxis, :]/dim
+    dim = np.arange(dim)[np.newaxis, :] / dim
 
     angle = 1 / (10000 ** dim)
     angle = position * angle
