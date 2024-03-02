@@ -5,3 +5,4 @@ from eegnet import EEGNet
 from wavenet import WaveNet
 from timm_models import EfficientNet, NFNet, CoaT, GCViT, CoAtNet, NextViT, SwinTransformer
 from csn import CSNModel
+from hybrid_transformer import HybridTransformer
