@@ -46,10 +46,10 @@ if __name__ == '__main__':
 
     raw_eeg_1d_eegnet_directory = 'raw_eeg_1d_eegnet_19x10000_quality_2'
     raw_eeg_2d_efficientnetv2medium_directory = 'raw_eeg_2d_efficientnetv2medium_384x512_quality_2'
-    raw_eeg_2d_coatlitemedium_directory = 'raw_eeg_2d_coatlitemedium_384x512_quality_2'
+    raw_eeg_2d_coatlitemedium_directory = 'raw_eeg_2d_coatlitemedium_384x512_ekg_quality_2'
     raw_eeg_2d_nextvitlarge_directory = 'raw_eeg_2d_nextvitlarge_384x512_quality_2'
-    raw_eeg_2d_maxvittiny_directory = 'raw_eeg_2d_maxvittiny_384x512_quality_2'
-    raw_eeg_2d_swinsmall_directory = 'raw_eeg_2d_swinsmall_384x512_quality_2'
+    raw_eeg_2d_maxvittiny_directory = 'raw_eeg_2d_maxvittiny_384x512_ekg_quality_2'
+    raw_eeg_2d_swinsmall_directory = 'raw_eeg_2d_swinsmall_384x512_ekg_quality_2'
     raw_eeg_3d_resnet50csn_directory = 'raw_eeg_3d_resnet50csn_5x96x512_quality_2'
 
     prediction_columns = [f'{column}_prediction' for column in target_columns]
