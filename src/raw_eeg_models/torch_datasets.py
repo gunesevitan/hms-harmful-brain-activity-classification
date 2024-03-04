@@ -59,7 +59,7 @@ class EEGDataset(Dataset):
 
         Returns
         -------
-        eeg: torch.Tensor of shape (channel, time) or (channel, time)
+        eeg: torch.Tensor of shape (channel, time) or (time, channel)
             Tensor of EEG
 
         targets: torch.Tensor of shape (6)
@@ -198,12 +198,12 @@ def read_eeg(eeg_path, interpolate_center=True, fill_edge_value=0, clip_bounds=(
         Value to fill missing values located at the edges
 
     clip_bounds: tuple or None
-        Lower and upper bound for clipping valus
+        Lower and upper bound for clipping values
 
     Returns
     -------
     eeg: numpy.ndarray of shape (channel, time)
-        Tensor of EEG
+        Array of EEG
     """
 
     eeg = pd.DataFrame(np.load(eeg_path))
