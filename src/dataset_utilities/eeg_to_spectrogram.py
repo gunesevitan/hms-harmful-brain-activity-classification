@@ -56,14 +56,6 @@ if __name__ == '__main__':
 
     df_train = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
 
-    groups = [
-        ['Fp1', 'F7', 'T3', 'T5', 'O1'],
-        ['Fp1', 'F3', 'C3', 'P3', 'O1'],
-        ['Fp2', 'F8', 'T4', 'T6', 'O2'],
-        ['Fp2', 'F4', 'C4', 'P4', 'O2'],
-        ['Fz', 'Cz', 'Pz']
-    ]
-
     for eeg_id, df_train_eeg in tqdm(df_train.groupby('eeg_id'), total=df_train['eeg_id'].nunique()):
 
         df_eeg = pd.read_parquet(eeg_directory / f'{eeg_id}.parquet')
