@@ -88,9 +88,7 @@ if __name__ == '__main__':
                     fs=200,
                     nperseg=280,
                     noverlap=260,
-                    nfft=None,
-                    detrend='constant',
-                    scaling='spectrum'
+                    nfft=None
                 )
                 frequency_mask = (frequencies >= 0.5) & (frequencies <= 20)
                 spectrogram = spectrogram[frequency_mask, :]
