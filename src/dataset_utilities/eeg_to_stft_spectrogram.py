@@ -3,11 +3,12 @@ import sys
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import scipy
 import cusignal
-
 
 sys.path.append('..')
 import settings
+import visualization
 
 
 def get_eeg_differences(eeg):
@@ -45,6 +46,15 @@ def get_eeg_differences(eeg):
     return eeg_difference
 
 
+def signal_filter(signal, cutoff, fs, order):
+
+    normal_cutoff = cutoff / (0.5 * fs)
+    sos = scipy.signal.butter(order, normal_cutoff, btype='low', output='sos')
+    y = scipy.signal.sosfiltfilt(sos, signal)
+
+    return y
+
+
 if __name__ == '__main__':
 
     dataset_directory = settings.DATA / 'eeg_spectrogramsv2'
@@ -53,6 +63,18 @@ if __name__ == '__main__':
 
     eeg_directory = settings.DATA / 'hms-harmful-brain-activity-classification' / 'train_eegs'
     eeg_file_names = os.listdir(eeg_directory)
+
+    spectrogram_config = {
+        'regular': {
+            'nperseg': 280,
+            'noverlap': 260
+        },
+        'chain_average': {
+            'nperseg': 1040,
+            'noverlap': 1022
+        }
+    }
+    spectrogram_type = 'regular'
 
     df_train = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
 
@@ -78,17 +100,43 @@ if __name__ == '__main__':
                 frequencies, times, spectrogram = cusignal.spectrogram(
                     eeg[:, signal_idx],
                     fs=200,
-                    nperseg=280,
-                    noverlap=260,
+                    nperseg=145,
+                    noverlap=124,
                     nfft=None
                 )
                 frequency_mask = (frequencies >= 0.5) & (frequencies <= 20)
-                spectrogram = spectrogram[frequency_mask, :]
+                spectrogram = spectrogram[frequency_mask, 3:-3]
                 spectrograms.append(spectrogram.get().astype(np.float32))
 
-            spectrograms = np.concatenate(spectrograms, axis=0)
+                frequencies_center, times_center, spectrogram_center = cusignal.spectrogram(
+                    eeg[4000:6000, signal_idx],
+                    fs=200,
+                    nperseg=145,
+                    noverlap=141,
+                    nfft=None
+                )
+                frequency_mask_center = (frequencies_center >= 0.5) & (frequencies_center <= 20)
+                spectrogram_center = spectrogram_center[frequency_mask_center, :]
+                spectrograms.append(spectrogram_center.get().astype(np.float32))
+
+            if spectrogram_type == 'regular':
+                spectrograms = np.concatenate(spectrograms, axis=0)
+            elif spectrogram_type == 'chain_average':
+                spectrogram_averages = [
+                    np.stack(spectrograms[0:4]).max(axis=0),
+                    np.stack(spectrograms[4:8]).max(axis=0),
+                    np.stack(spectrograms[8:12]).max(axis=0),
+                    np.stack(spectrograms[12:16]).max(axis=0),
+                    np.stack(spectrograms[16:18]).max(axis=0)
+                ]
+                spectrogram_averages = np.concatenate(spectrogram_averages, axis=0)
+
             np.save(spectrogram_file_path, spectrograms)
-            #import matplotlib.pyplot as plt
-            #plt.imshow(np.log(spectrograms))
-            #plt.show()
+            #spectrograms = np.log1p(spectrograms)
+            #mean = spectrograms.mean()
+            #std = spectrograms.std()
+            #min = spectrograms.min()
+            #max = spectrograms.max()
+            #spec_id = str(spectrogram_file_path).split('/')[-1]
+            #visualization.visualize_spectrogram(np.log1p(spectrograms), f'Spectrogram {spec_id} - Mean: {mean:.2f} Std: {std:.2f} Min: {min:.2f} Max: {max:.2f}')
             #exit()
