@@ -294,7 +294,7 @@ if __name__ == '__main__':
 
     input_dimensions = config['training']['input_dimensions']
     if input_dimensions == 2:
-        dataset_transforms = transforms.get_spectrogram_2d_transforms(**config['transforms'])
+        dataset_transforms = transforms.get_multitaper_spectrogram_2d_transforms(**config['transforms'])
     else:
         raise ValueError(f'Invalid input dimensions {input_dimensions}')
 
@@ -567,10 +567,19 @@ if __name__ == '__main__':
                     tta_flip_dimensions = config['test']['tta_flip_dimensions']
 
                     tta_outputs = []
-
+                    # TODO : fix TTA
                     for dimensions in tta_flip_dimensions:
+                        augmented_inputs = inputs
 
-                        augmented_inputs = torch.flip(inputs, dims=dimensions).to(device)
+                        if 2 in dimensions:
+                            new_augmented_inputs = [inputs[:6]]
+                            for idx in [1, 0, 3, 2, 4]:
+                                new_augmented_inputs.append(inputs[6+idx*100:6+(idx+1)*100])
+            
+                            new_augmented_inputs.append(inputs[506:])
+                            augmented_inputs = torch.concatenate(new_augmented_inputs, dim=0)
+
+                        augmented_inputs = augmented_inputs.to(device)
 
                         with torch.no_grad():
                             if amp:
