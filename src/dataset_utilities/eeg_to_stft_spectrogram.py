@@ -3,7 +3,6 @@ import sys
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-import scipy
 import cusignal
 
 sys.path.append('..')
@@ -46,37 +45,35 @@ def get_eeg_differences(eeg):
     return eeg_difference
 
 
-def signal_filter(signal, cutoff, fs, order):
+def get_spectrogram(signal, fs, nperseg, noverlap, frequency_range):
 
-    normal_cutoff = cutoff / (0.5 * fs)
-    sos = scipy.signal.butter(order, normal_cutoff, btype='low', output='sos')
-    y = scipy.signal.sosfiltfilt(sos, signal)
+    frequencies, _, spectrogram = cusignal.spectrogram(
+        signal,
+        fs=fs,
+        nperseg=nperseg,
+        noverlap=noverlap,
+        nfft=None
+    )
+    frequency_mask = (frequencies >= frequency_range[0]) & (frequencies <= frequency_range[1])
+    spectrogram = spectrogram[frequency_mask, :]
+    spectrogram = spectrogram.get().astype(np.float32)
 
-    return y
+    return spectrogram
 
 
 if __name__ == '__main__':
 
-    dataset_directory = settings.DATA / 'eeg_spectrogramsv2'
+    dataset_directory = settings.DATA / 'eeg_spectrograms-50-30-10-second'
     dataset_directory.mkdir(parents=True, exist_ok=True)
     (dataset_directory / 'spectrograms').mkdir(parents=True, exist_ok=True)
 
     eeg_directory = settings.DATA / 'hms-harmful-brain-activity-classification' / 'train_eegs'
     eeg_file_names = os.listdir(eeg_directory)
 
-    spectrogram_config = {
-        'regular': {
-            'nperseg': 280,
-            'noverlap': 260
-        },
-        'chain_average': {
-            'nperseg': 1040,
-            'noverlap': 1022
-        }
-    }
-    spectrogram_type = 'regular'
-
     df_train = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
+
+    time_stack = '50/30/10'
+    visualize = False
 
     for eeg_id, df_train_eeg in tqdm(df_train.groupby('eeg_id'), total=df_train['eeg_id'].nunique()):
 
@@ -97,46 +94,83 @@ if __name__ == '__main__':
             spectrograms = []
 
             for signal_idx in range(eeg.shape[1]):
-                frequencies, times, spectrogram = cusignal.spectrogram(
-                    eeg[:, signal_idx],
-                    fs=200,
-                    nperseg=145,
-                    noverlap=124,
-                    nfft=None
-                )
-                frequency_mask = (frequencies >= 0.5) & (frequencies <= 20)
-                spectrogram = spectrogram[frequency_mask, 3:-3]
-                spectrograms.append(spectrogram.get().astype(np.float32))
 
-                frequencies_center, times_center, spectrogram_center = cusignal.spectrogram(
-                    eeg[4000:6000, signal_idx],
-                    fs=200,
-                    nperseg=145,
-                    noverlap=141,
-                    nfft=None
-                )
-                frequency_mask_center = (frequencies_center >= 0.5) & (frequencies_center <= 20)
-                spectrogram_center = spectrogram_center[frequency_mask_center, :]
-                spectrograms.append(spectrogram_center.get().astype(np.float32))
+                if time_stack == '50/30/10':
 
-            if spectrogram_type == 'regular':
-                spectrograms = np.concatenate(spectrograms, axis=0)
-            elif spectrogram_type == 'chain_average':
-                spectrogram_averages = [
-                    np.stack(spectrograms[0:4]).max(axis=0),
-                    np.stack(spectrograms[4:8]).max(axis=0),
-                    np.stack(spectrograms[8:12]).max(axis=0),
-                    np.stack(spectrograms[12:16]).max(axis=0),
-                    np.stack(spectrograms[16:18]).max(axis=0)
-                ]
-                spectrogram_averages = np.concatenate(spectrogram_averages, axis=0)
+                    # 50 second spectrogram is created and trimmed on the x-axis for 20 pixels
+                    spectrogram_50 = get_spectrogram(
+                        signal=eeg[:, signal_idx],
+                        fs=200,
+                        nperseg=99,
+                        noverlap=79,
+                        frequency_range=(0.5, 20),
+                    )[:, 10:-10]
+                    spectrograms.append(spectrogram_50)
+
+                    # Center 30 second spectrogram is created and trimmed on the x-axis for 16 pixels
+                    spectrogram_30 = get_spectrogram(
+                        signal=eeg[2000:8000, signal_idx],
+                        fs=200,
+                        nperseg=99,
+                        noverlap=87,
+                        frequency_range=(0.5, 20),
+                    )[:, 8:-8]
+                    spectrograms.append(spectrogram_30)
+
+                    # Center 10 second spectrogram with the highest time resolution is created
+                    spectrogram_10 = get_spectrogram(
+                        signal=eeg[4000:6000, signal_idx],
+                        fs=200,
+                        nperseg=100,
+                        noverlap=96,
+                        frequency_range=(0.5, 20),
+                    )
+                    spectrograms.append(spectrogram_10)
+
+                elif time_stack == '50/10':
+                    # 50 second spectrogram is created and trimmed on the x-axis for 6 pixels
+                    spectrogram_50 = get_spectrogram(
+                        signal=eeg[:, signal_idx],
+                        fs=200,
+                        nperseg=145,
+                        noverlap=124,
+                        frequency_range=(0.5, 20),
+                    )[:, 3:-3]
+                    spectrograms.append(spectrogram_50)
+
+                    # Center 10 second spectrogram with the highest time resolution is created
+                    spectrogram_10 = get_spectrogram(
+                        signal=eeg[4000:6000, signal_idx],
+                        fs=200,
+                        nperseg=145,
+                        noverlap=141,
+                        frequency_range=(0.5, 20),
+                    )
+                    spectrograms.append(spectrogram_10)
+                elif time_stack == '50':
+                    # 50 second spectrogram is created
+                    spectrogram_50 = get_spectrogram(
+                        signal=eeg[:, signal_idx],
+                        fs=200,
+                        nperseg=280,
+                        noverlap=260,
+                        frequency_range=(0.5, 20),
+
+                    )
+                    spectrograms.append(spectrogram_50)
+
+            spectrograms = np.concatenate(spectrograms, axis=0)
 
             np.save(spectrogram_file_path, spectrograms)
-            #spectrograms = np.log1p(spectrograms)
-            #mean = spectrograms.mean()
-            #std = spectrograms.std()
-            #min = spectrograms.min()
-            #max = spectrograms.max()
-            #spec_id = str(spectrogram_file_path).split('/')[-1]
-            #visualization.visualize_spectrogram(np.log1p(spectrograms), f'Spectrogram {spec_id} - Mean: {mean:.2f} Std: {std:.2f} Min: {min:.2f} Max: {max:.2f}')
-            #exit()
+
+            if visualize:
+                spectrograms = np.log1p(spectrograms)
+                mean = spectrograms.mean()
+                std = spectrograms.std()
+                min = spectrograms.min()
+                max = spectrograms.max()
+                spectrogram_id = str(spectrogram_file_path).split('/')[-1]
+                visualization.visualize_spectrogram(
+                    spectrograms,
+                    f'Spectrogram {spectrogram_id} - Mean: {mean:.2f} Std: {std:.2f} Min: {min:.2f} Max: {max:.2f}'
+                )
