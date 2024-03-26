@@ -12,6 +12,74 @@ import raw_eeg_transforms
 import transforms
 
 
+def normalize_probabilities(df, columns):
+
+    df_sums = df[columns].sum(axis=1)
+    for column in columns:
+        df[column] /= df_sums
+
+    return df
+
+
+def blend(df_pseudo_labels):
+
+    target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
+
+    for fold in range(1, 6):
+
+        # 50 second raw EEG prediction columns
+        raw_eeg_50_second_2d_convnextbase_prediction_columns = [f'raw_eeg_50_second_2d_convnextbase_{column}_prediction_fold{fold}' for column in target_columns]
+        raw_eeg_50_second_2d_maxvittiny_prediction_columns = [f'raw_eeg_50_second_2d_maxvittiny_{column}_prediction_fold{fold}' for column in target_columns]
+
+        # 50/10 second raw EEG prediction columns
+        raw_eeg_50_10_second_2d_convnextbase_prediction_columns = [f'raw_eeg_50_10_second_2d_convnextbase_{column}_prediction_fold{fold}' for column in target_columns]
+        raw_eeg_50_10_second_2d_maxvittiny_prediction_columns = [f'raw_eeg_50_10_second_2d_maxvittiny_{column}_prediction_fold{fold}' for column in target_columns]
+
+        # 50 second spectrogram prediction columns
+        spectrogram_50_second_2d_convnextbase_prediction_columns = [f'spectrogram_50_second_2d_convnextbase_{column}_prediction_fold{fold}' for column in target_columns]
+        spectrogram_50_second_2d_maxvittiny_prediction_columns = [f'spectrogram_50_second_2d_maxvittiny_{column}_prediction_fold{fold}' for column in target_columns]
+
+        # 50/10 second spectrogram prediction columns
+        spectrogram_50_10_second_2d_convnextbase_prediction_columns = [f'spectrogram_50_10_second_2d_convnextbase_{column}_prediction_fold{fold}' for column in target_columns]
+        spectrogram_50_10_second_2d_maxvittiny_prediction_columns = [f'spectrogram_50_10_second_2d_maxvittiny_{column}_prediction_fold{fold}' for column in target_columns]
+
+        # 50/30/10 second spectrogram prediction columns
+        spectrogram_50_30_10_second_2d_convnextbase_prediction_columns = [f'spectrogram_50_30_10_second_2d_convnextbase_{column}_prediction_fold{fold}' for column in target_columns]
+        spectrogram_50_30_10_second_2d_maxvittiny_prediction_columns = [f'spectrogram_50_30_10_second_2d_maxvittiny_{column}_prediction_fold{fold}' for column in target_columns]
+
+        # Raw EEG blend
+        raw_eeg_blend_prediction_columns = [f'raw_eeg_blend_{column}_prediction_fold{fold}' for column in target_columns]
+        df_pseudo_labels[raw_eeg_blend_prediction_columns] = (df_pseudo_labels[raw_eeg_50_second_2d_convnextbase_prediction_columns] * 0.25).values + \
+                                                             (df_pseudo_labels[raw_eeg_50_second_2d_maxvittiny_prediction_columns] * 0.25).values + \
+                                                             (df_pseudo_labels[raw_eeg_50_10_second_2d_convnextbase_prediction_columns] * 0.25).values + \
+                                                             (df_pseudo_labels[raw_eeg_50_10_second_2d_maxvittiny_prediction_columns] * 0.25).values
+
+        df_pseudo_labels = normalize_probabilities(df_pseudo_labels, raw_eeg_blend_prediction_columns)
+
+        # Spectrogram blend
+        spectrogram_blend_prediction_columns = [f'spectrogram_blend_{column}_prediction_fold{fold}' for column in target_columns]
+        df_pseudo_labels[spectrogram_blend_prediction_columns] = (df_pseudo_labels[spectrogram_50_second_2d_convnextbase_prediction_columns] * 0.125).values + \
+                                                                 (df_pseudo_labels[spectrogram_50_second_2d_maxvittiny_prediction_columns] * 0.125).values + \
+                                                                 (df_pseudo_labels[spectrogram_50_10_second_2d_convnextbase_prediction_columns] * 0.25).values + \
+                                                                 (df_pseudo_labels[spectrogram_50_10_second_2d_maxvittiny_prediction_columns] * 0.25).values + \
+                                                                 (df_pseudo_labels[spectrogram_50_30_10_second_2d_convnextbase_prediction_columns] * 0.125).values + \
+                                                                 (df_pseudo_labels[spectrogram_50_30_10_second_2d_maxvittiny_prediction_columns] * 0.125).values
+
+        df_pseudo_labels = normalize_probabilities(df_pseudo_labels, spectrogram_blend_prediction_columns)
+
+        # Final blend
+        blend_prediction_columns = [f'blend_{column}_prediction_fold{fold}' for column in target_columns]
+        df_pseudo_labels[blend_prediction_columns] = (df_pseudo_labels[raw_eeg_blend_prediction_columns] * 0.3).values + \
+                                                     (df_pseudo_labels[spectrogram_blend_prediction_columns] * 0.7).values
+
+        df_pseudo_labels = normalize_probabilities(df_pseudo_labels, blend_prediction_columns)
+
+    blend_prediction_columns = [f'blend_{column}_prediction_fold{fold}' for column in target_columns for fold in range(1, 6)]
+    df_pseudo_labels = df_pseudo_labels.loc[:, ['eeg_id', 'eeg_sub_id'] + blend_prediction_columns]
+
+    return df_pseudo_labels
+
+
 if __name__ == '__main__':
 
     df = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
@@ -146,6 +214,19 @@ if __name__ == '__main__':
         ],
         device=torch.device('cuda')
     )
+
+    model_names = [
+        'raw_eeg_50_second_2d_convnextbase',
+        'raw_eeg_50_second_2d_maxvittiny',
+        'raw_eeg_50_10_second_2d_convnextbase',
+        'raw_eeg_50_10_second_2d_maxvittiny',
+        'spectrogram_50_second_2d_convnextbase',
+        'spectrogram_50_second_2d_maxvittiny',
+        'spectrogram_50_10_second_2d_convnextbase',
+        'spectrogram_50_10_second_2d_maxvittiny',
+        'spectrogram_50_30_10_second_2d_convnextbase',
+        'spectrogram_50_30_10_second_2d_maxvittiny',
+    ]
 
     # Global configurations
     device = torch.device('cuda')
@@ -494,5 +575,23 @@ if __name__ == '__main__':
         blend_predictions = (raw_eeg_blend_predictions * 0.3) + \
                             (spectrogram_blend_predictions * 0.7)
 
-        for fold in range(5):
-            df.loc[idx, [f'{column}_fold{fold + 1}' for column in prediction_columns]] = blend_predictions[fold]
+        model_predictions = [
+            raw_eeg_50_second_2d_convnext_predictions,
+            raw_eeg_50_second_2d_maxvit_predictions,
+            raw_eeg_50_10_second_2d_convnext_predictions,
+            raw_eeg_50_10_second_2d_maxvit_predictions,
+            spectrogram_50_second_2d_convnext_predictions,
+            spectrogram_50_second_2d_maxvit_predictions,
+            spectrogram_50_10_second_2d_convnext_predictions,
+            spectrogram_50_10_second_2d_maxvit_predictions,
+            spectrogram_50_30_10_second_2d_convnext_predictions,
+            spectrogram_50_30_10_second_2d_maxvit_predictions
+        ]
+
+        for model_prediction, model_name in zip(model_predictions, model_names):
+            for fold in range(5):
+                df.loc[idx, [f'{model_name}_{column}_fold{fold + 1}' for column in prediction_columns]] = model_prediction[fold]
+
+    df = df.loc[df['sample_quality'] < 2, :].reset_index(drop=True)
+    prediction_columns = [column for column in df.columns.tolist() if 'prediction' in column]
+    df.loc[:, ['eeg_id', 'eeg_sub_id'] + prediction_columns].to_csv(settings.DATA / 'pseudo_labels.csv', index=False)
