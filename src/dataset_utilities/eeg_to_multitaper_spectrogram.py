@@ -10,6 +10,7 @@ from eeg_to_multitaper_spectrogram import multitaper_spectrogram
 
 
 def get_eeg_differences(eeg):
+
     eeg_difference = np.zeros((eeg.shape[0], 18))
 
     # Left outside temporal chain
@@ -59,6 +60,7 @@ if __name__ == '__main__':
 
         df_eeg = pd.read_parquet(eeg_directory / f'{eeg_id}.parquet')
         # df_eeg = df_eeg.interpolate(method='linear', limit_area='inside').fillna(0)
+
         df_eeg = df_eeg.fillna(0)
 
         eeg_label_offset_seconds = df_train_eeg['eeg_label_offset_seconds'].tolist()
@@ -71,6 +73,7 @@ if __name__ == '__main__':
         eeg = get_eeg_differences(eeg)
 
         spectrograms, spectrograms_center = [], []
+
         for signal_idx in range(eeg.shape[1]):
             spect, stimes, sfreqs = multitaper_spectrogram(
                 eeg[:, signal_idx],
