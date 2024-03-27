@@ -14,6 +14,23 @@ import transforms
 
 def normalize_probabilities(df, columns):
 
+    """
+    Normalize probabilities to 1 within given columns
+
+    Parameters
+    ----------
+    df: pandas.DataFrame
+        Dataframe with given columns
+
+    columns: list
+        List of column names that have probabilities
+
+    Returns
+    -------
+    df: pandas.DataFrame
+        Dataframe with given columns' sum adjusted to 1
+    """
+
     df_sums = df[columns].sum(axis=1)
     for column in columns:
         df[column] /= df_sums
@@ -22,6 +39,20 @@ def normalize_probabilities(df, columns):
 
 
 def blend(df_pseudo_labels):
+
+    """
+    Blend pseudo labels in a way that has the highest OOF score of 0.2164 (0.23 LB)
+
+    Parameters
+    ----------
+    df_pseudo_labels: pandas.DataFrame
+        Dataframe with pseudo labels
+
+    Returns
+    -------
+    df: pandas.DataFrame
+        Dataframe with blended and stationary period averaged pseudo labels
+    """
 
     target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
 
@@ -75,6 +106,7 @@ def blend(df_pseudo_labels):
         df_pseudo_labels = normalize_probabilities(df_pseudo_labels, blend_prediction_columns)
 
     blend_prediction_columns = [f'blend_{column}_prediction_fold{fold}' for column in target_columns for fold in range(1, 6)]
+    df_pseudo_labels[blend_prediction_columns] = df_pseudo_labels.groupby(['stationary_period'])[blend_prediction_columns].transform('mean')
     df_pseudo_labels = df_pseudo_labels.loc[:, ['eeg_id', 'eeg_sub_id'] + blend_prediction_columns]
 
     return df_pseudo_labels
@@ -87,7 +119,7 @@ if __name__ == '__main__':
 
     # Read and merge precomputed folds
     df_folds = pd.read_csv(settings.DATA / 'folds.csv')
-    df = df.merge(df_folds, on=['eeg_id', 'eeg_sub_id', 'spectrogram_id', 'spectrogram_sub_id'], how='left').dropna().reset_index(drop=True)
+    df = df.merge(df_folds, on=['eeg_id', 'eeg_sub_id', 'spectrogram_id', 'spectrogram_sub_id'], how='left').reset_index(drop=True)
     del df_folds
 
     target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
