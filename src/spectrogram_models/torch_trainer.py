@@ -22,6 +22,7 @@ sys.path.append('..')
 import settings
 import metrics
 import visualization
+import pseudo_labels
 
 
 def train(training_loader, model, criterion, optimizer, device, task_type, scheduler=None, amp=False):
@@ -282,13 +283,26 @@ if __name__ == '__main__':
 
     # Read and merge precomputed folds
     df_folds = pd.read_csv(settings.DATA / 'folds.csv')
-    df = df.merge(df_folds, on=['eeg_id', 'eeg_sub_id', 'spectrogram_id', 'spectrogram_sub_id'], how='left').dropna().reset_index(drop=True)
+    df = df.merge(df_folds, on=['eeg_id', 'eeg_sub_id', 'spectrogram_id', 'spectrogram_sub_id'], how='left').reset_index(drop=True)
     del df_folds
 
+    # Extract sample quality from vote counts and normalize targets
     target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
     df = preprocessing.extract_sample_quality(df=df, target_columns=target_columns)
     if normalize_targets:
         df = preprocessing.normalize_targets(df=df, target_columns=target_columns)
+
+    # Read, blend, aggregate and merge pseudo labels
+    df_pseudo_labels = pd.read_csv(settings.DATA / 'all_pseudo_labels_v2.csv')
+    df_pseudo_labels = pseudo_labels.blend(df_pseudo_labels=df_pseudo_labels)
+    df = df.merge(
+        df_pseudo_labels,
+        on=['eeg_id', 'eeg_sub_id'],
+        how='left'
+    )
+
+    # Drop samples that are not in training or validation sets
+    df = df.loc[df[config['training']['folds']].notna().any(axis=1)].reset_index(drop=True)
 
     torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -303,6 +317,11 @@ if __name__ == '__main__':
         training_metadata = defaultdict(dict)
 
         for fold in config['training']['folds']:
+
+            fold_pseudo_label_columns = [column for column in df.columns.tolist() if column.endswith(f'_{fold}')]
+
+            if config['training']['use_pseudo_labels']:
+                df.loc[df['sample_quality'] < 2, target_columns] = df.loc[df['sample_quality'] < 2, fold_pseudo_label_columns].values
 
             training_idx, validation_idx = df.loc[df[fold] != 1].index, df.loc[df[fold] == 1].index
             # Validate on training set if validation is set is not specified
