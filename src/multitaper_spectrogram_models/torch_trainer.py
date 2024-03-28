@@ -494,6 +494,7 @@ if __name__ == '__main__':
 
         folds = config['test']['folds']
         model_file_names = config['test']['model_file_names']
+        has_10s = config['test']['has_10s']
 
         for fold, model_file_name in zip(folds, model_file_names):
 
@@ -567,17 +568,39 @@ if __name__ == '__main__':
                     tta_flip_dimensions = config['test']['tta_flip_dimensions']
 
                     tta_outputs = []
-                    # TODO : fix TTA
                     for dimensions in tta_flip_dimensions:
                         augmented_inputs = inputs
 
                         if 2 in dimensions:
-                            new_augmented_inputs = [inputs[:6]]
+                            # v-filp, flip left-right hemispheres
+                            new_augmented_inputs = [inputs[:, :, :6]]
                             for idx in [1, 0, 3, 2, 4]:
-                                new_augmented_inputs.append(inputs[6+idx*100:6+(idx+1)*100])
+                                new_augmented_inputs.append(inputs[:, :, 6+idx*100:6+(idx+1)*100])
             
-                            new_augmented_inputs.append(inputs[506:])
-                            augmented_inputs = torch.concatenate(new_augmented_inputs, dim=0)
+                            new_augmented_inputs.append(inputs[:, :, 506:])
+                            augmented_inputs = torch.concatenate(new_augmented_inputs, dim=2)
+
+                        if 3 in dimensions:
+                            # h-flip, flip individual signals
+                            if has_10s:
+                                new_augmented_inputs = [augmented_inputs[:, :, :, :12]]
+                                for idx in range(4):
+                                    new_augmented_inputs.append(
+                                        torch.flip(augmented_inputs[:, :, :, 12+idx*106:-1+(idx+1)*106], dims=[3])
+                                    )
+                                    new_augmented_inputs.append(
+                                        torch.flip(augmented_inputs[:, :, :, -1+(idx+1)*106:12+(idx+1)*106], dims=[3])
+                                    )
+                                new_augmented_inputs.append(inputs[:, :, :, 436:])
+                            else:
+                                new_augmented_inputs = [augmented_inputs[:, :, :, :6]]
+                                for idx in range(4):
+                                    new_augmented_inputs.append(
+                                        torch.flip(augmented_inputs[:, :, :, 6+idx*93:6+(idx+1)*93], dims=[3])
+                                    )
+                                new_augmented_inputs.append(inputs[:, :, :, 378:])
+
+                            augmented_inputs = torch.concatenate(new_augmented_inputs, dim=3)
 
                         augmented_inputs = augmented_inputs.to(device)
 
