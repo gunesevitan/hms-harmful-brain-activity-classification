@@ -333,5 +333,6 @@ def load_timm_model(model_directory, model_file_names, device):
         model.to(device)
         model.eval()
         models[model_file_name] = model
+        print(f'Loaded {config["model"]["model_class"]} model from {model_directory / model_file_name} to {device}')
 
     return models, config
