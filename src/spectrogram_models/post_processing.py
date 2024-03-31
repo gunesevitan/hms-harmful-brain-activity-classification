@@ -288,9 +288,9 @@ if __name__ == '__main__':
         oof_scores.update(sample_quality_oof_scores)
     settings.logger.info(f'Blend OOF Scores: {json.dumps(oof_scores, indent=2)}\n')
 
-    for column in prediction_columns:
-        df_blend.loc[df_blend[column] > 0.8, column] = 1
-    df_blend = normalize_probabilities(df=df_blend, columns=prediction_columns)
+    #for column in prediction_columns:
+    #    df_blend.loc[df_blend[column] > 0.8, column] = 1
+    #df_blend = normalize_probabilities(df=df_blend, columns=prediction_columns)
 
     df_blend['seizure_vote_prediction'] *= 1.
     df_blend['lpd_vote_prediction'] *= 1.
