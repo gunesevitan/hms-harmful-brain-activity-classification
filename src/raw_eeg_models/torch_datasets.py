@@ -74,7 +74,7 @@ class EEGDataset(Dataset):
             current_eeg_path = self.eeg_paths[idx]
 
             # Extract same stationary period subsample paths from the EEG id
-            eeg_id_path = '_'.join(current_eeg_path.split('_')[:2])
+            eeg_id_path = '_'.join(current_eeg_path.split('_')[:3])
             stationary_period_eeg_paths = glob(f'{eeg_id_path}*')
             stationary_period_eeg_paths = [path for path in stationary_period_eeg_paths if path != current_eeg_path]
 
@@ -250,7 +250,7 @@ def prepare_data(df, eeg_dataset_path):
         Array of sample qualities
     """
 
-    df['eeg_file_name'] = df['eeg_id'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
+    df['eeg_file_name'] = df['eeg_id'].astype(str) + '_' + df['stationary_period'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
     df['eeg_path'] = df['eeg_file_name'].apply(lambda x: str(eeg_dataset_path) + '/eegs/' + x)
     eeg_paths = df['eeg_path'].values
 
