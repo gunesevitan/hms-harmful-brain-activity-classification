@@ -332,12 +332,13 @@ class NonCenterTemporalDropout1D(ImageOnlyTransform):
 
 class EEGTo2D(ImageOnlyTransform):
 
-    def __init__(self, ekg, center_stack, always_apply=True, p=1.0):
+    def __init__(self, ekg, center_10_stack, center_30_stack, always_apply=True, p=1.0):
 
         super(EEGTo2D, self).__init__(always_apply=always_apply, p=p)
 
         self.ekg = ekg
-        self.center_stack = center_stack
+        self.center_10_stack = center_10_stack
+        self.center_30_stack = center_30_stack
 
     def apply(self, inputs, **kwargs):
 
@@ -357,8 +358,11 @@ class EEGTo2D(ImageOnlyTransform):
 
         inputs = inputs.T
 
-        if self.center_stack:
-            center = inputs[:, 4000:6000]
+        if self.center_10_stack:
+            center_10 = inputs[:, 4000:6000]
+
+        if self.center_30_stack:
+            center_30 = inputs[:, 2000:8000]
 
         image = []
         n_channels = 19 if self.ekg else 18
@@ -367,9 +371,13 @@ class EEGTo2D(ImageOnlyTransform):
             for j in range(20):
                 image.append(inputs[i, j::20])
 
-            if self.center_stack:
+            if self.center_30_stack:
+                for j in range(12):
+                    image.append(center_30[i, j::12])
+
+            if self.center_10_stack:
                 for j in range(4):
-                    image.append(center[i, j::4])
+                    image.append(center_10[i, j::4])
 
         image = np.stack(image, axis=0)
 
@@ -577,7 +585,7 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
             drop_value=0,
             p=transform_parameters['non_center_temporal_dropout_probability']
         ),
-        EEGTo2D(transform_parameters['ekg'], transform_parameters['center_stack'], always_apply=True),
+        EEGTo2D(transform_parameters['ekg'], transform_parameters['center_10_stack'], transform_parameters['center_30_stack'], always_apply=True),
         A.CoarseDropout(
             max_holes=transform_parameters['coarse_dropout_max_holes'],
             min_holes=transform_parameters['coarse_dropout_min_holes'],
@@ -602,7 +610,7 @@ def get_raw_eeg_2d_transforms(**transform_parameters):
 
     inference_transforms = A.Compose([
         ChannelDifference1D(transform_parameters['ekg'], always_apply=True),
-        EEGTo2D(transform_parameters['ekg'], transform_parameters['center_stack'], always_apply=True),
+        EEGTo2D(transform_parameters['ekg'], transform_parameters['center_10_stack'], transform_parameters['center_30_stack'], always_apply=True),
         A.PadIfNeeded(
             min_height=transform_parameters['pad_min_height'],
             min_width=transform_parameters['pad_min_width'],
