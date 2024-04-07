@@ -47,6 +47,8 @@ if __name__ == '__main__':
     raw_eeg_50_second_2d_maxvittiny_directory = 'raw_eeg_50_second_2d_maxvittiny_384x512_quality_2'
     raw_eeg_50_10_second_2d_convnextbase_directory = 'raw_eeg_50_10_second_2d_convnextbase_448x512_quality_2'
     raw_eeg_50_10_second_2d_maxvittiny_directory = 'raw_eeg_50_10_second_2d_maxvittiny_448x512_quality_2'
+    raw_eeg_50_30_10_second_2d_convnextbase_directory = 'raw_eeg_50_30_10_second_2d_convnextbase_672x512_quality_2'
+    raw_eeg_50_30_10_second_2d_maxvittiny_directory = 'raw_eeg_50_30_10_second_2d_maxvittiny_672x512_quality_2'
 
     prediction_columns = [f'{column}_prediction' for column in target_columns]
     columns_to_merge = ['eeg_id', 'eeg_sub_id', 'sample_quality']
@@ -59,18 +61,26 @@ if __name__ == '__main__':
     df_raw_eeg_50_10_second_2d_convnextbase = df_raw_eeg_50_10_second_2d_convnextbase.merge(df.loc[:, columns_to_merge], on=columns_to_merge[:-1], how='left')
     df_raw_eeg_50_10_second_2d_maxvittiny = pd.read_csv(settings.MODELS / raw_eeg_50_10_second_2d_maxvittiny_directory / 'oof_predictions.csv')
     df_raw_eeg_50_10_second_2d_maxvittiny = df_raw_eeg_50_10_second_2d_maxvittiny.merge(df.loc[:, columns_to_merge], on=columns_to_merge[:-1], how='left')
+    df_raw_eeg_50_30_10_second_2d_convnextbase = pd.read_csv(settings.MODELS / raw_eeg_50_30_10_second_2d_convnextbase_directory / 'oof_predictions.csv')
+    df_raw_eeg_50_30_10_second_2d_convnextbase = df_raw_eeg_50_30_10_second_2d_convnextbase.merge(df.loc[:, columns_to_merge], on=columns_to_merge[:-1], how='left')
+    df_raw_eeg_50_30_10_second_2d_maxvittiny = pd.read_csv(settings.MODELS / raw_eeg_50_30_10_second_2d_maxvittiny_directory / 'oof_predictions.csv')
+    df_raw_eeg_50_30_10_second_2d_maxvittiny = df_raw_eeg_50_30_10_second_2d_maxvittiny.merge(df.loc[:, columns_to_merge], on=columns_to_merge[:-1], how='left')
 
     prediction_dfs = [
         df_raw_eeg_50_second_2d_convnextbase,
         df_raw_eeg_50_second_2d_maxvittiny,
         df_raw_eeg_50_10_second_2d_convnextbase,
-        df_raw_eeg_50_10_second_2d_maxvittiny
+        df_raw_eeg_50_10_second_2d_maxvittiny,
+        df_raw_eeg_50_30_10_second_2d_convnextbase,
+        df_raw_eeg_50_30_10_second_2d_maxvittiny
     ]
     model_names = [
         'raw_eeg_50_second_2d_convnextbase_384x512_quality_2',
         'raw_eeg_50_second_2d_maxvittiny_384x512_quality_2',
         'raw_eeg_50_10_second_2d_convnextbase_448x512_quality_2',
         'raw_eeg_50_10_second_2d_maxvittiny_448x512_quality_2',
+        'raw_eeg_50_30_10_second_2d_convnext_672x512_quality_2',
+        'raw_eeg_50_30_10_second_2d_maxvittiny_672x512_quality_2'
     ]
     for model_name, df in zip(model_names, prediction_dfs):
         oof_scores = metrics.multiclass_classification_scores(
@@ -88,10 +98,12 @@ if __name__ == '__main__':
         settings.logger.info(f'{model_name} OOF Scores: {json.dumps(oof_scores, indent=2)}\n')
 
     df_blend = df_raw_eeg_50_second_2d_convnextbase.copy(deep=True)
-    df_blend[prediction_columns] = (df_raw_eeg_50_second_2d_convnextbase[prediction_columns] * 0.25).values + \
-                                   (df_raw_eeg_50_second_2d_maxvittiny[prediction_columns] * 0.25).values + \
-                                   (df_raw_eeg_50_10_second_2d_convnextbase[prediction_columns] * 0.25).values + \
-                                   (df_raw_eeg_50_10_second_2d_maxvittiny[prediction_columns] * 0.25).values
+    df_blend[prediction_columns] = (df_raw_eeg_50_second_2d_convnextbase[prediction_columns] * 0.166).values + \
+                                   (df_raw_eeg_50_second_2d_maxvittiny[prediction_columns] * 0.166).values + \
+                                   (df_raw_eeg_50_10_second_2d_convnextbase[prediction_columns] * 0.170).values + \
+                                   (df_raw_eeg_50_10_second_2d_maxvittiny[prediction_columns] * 0.166).values + \
+                                   (df_raw_eeg_50_30_10_second_2d_convnextbase[prediction_columns] * 0.166).values + \
+                                   (df_raw_eeg_50_30_10_second_2d_maxvittiny[prediction_columns] * 0.166).values
 
     df_blend = normalize_probabilities(df_blend, prediction_columns)
     oof_scores = metrics.multiclass_classification_scores(
