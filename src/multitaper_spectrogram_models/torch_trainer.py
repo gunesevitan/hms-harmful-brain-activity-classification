@@ -277,12 +277,30 @@ if __name__ == '__main__':
     spectrogram_dataset_path = settings.DATA / config['dataset']['spectrogram_dataset']
     normalize_targets = config['dataset']['normalize_targets']
 
-    df = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
+    df = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'hms_train_metadata_expanded.csv')
     settings.logger.info(f'Dataset Shape: {df.shape} - Memory Usage: {df.memory_usage().sum() / 1024 ** 2:.2f} MB')
 
     # Read and merge precomputed folds
     df_folds = pd.read_csv(settings.DATA / 'folds.csv')
-    df = df.merge(df_folds, on=['eeg_id', 'eeg_sub_id', 'spectrogram_id', 'spectrogram_sub_id'], how='left').dropna().reset_index(drop=True)
+
+    df = df.merge(df_folds, on=['eeg_id', 'eeg_sub_id', 'spectrogram_id', 'spectrogram_sub_id'], how='left').reset_index(drop=True)
+    df = df.groupby('sp').agg({
+        'eeg_id': 'first',
+        'eeg_sub_id': 'first',
+        'eeg_label_offset_seconds': list,
+        'spectrogram_id': 'first',
+        'spectrogram_sub_id': 'first',
+        'spectrogram_label_offset_seconds': list,
+        'seizure_vote': 'first',
+        'lpd_vote': 'first',
+        'gpd_vote': 'first',
+        'lrda_vote': 'first',
+        'grda_vote': 'first',
+        'other_vote': 'first',
+        'label_type': 'first',
+        'expert_consensus': 'first',
+        'fold1': 'first', 'fold2': 'first', 'fold3': 'first', 'fold4': 'first', 'fold5': 'first'
+    }).reset_index()
     del df_folds
 
     target_columns = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
@@ -314,11 +332,11 @@ if __name__ == '__main__':
             training_idx = training_idx.intersection(sample_quality_idx)
 
             # Create training and validation inputs and targets
-            training_spectrogram_paths, training_targets, training_target_classes, training_sample_qualities = torch_datasets.prepare_data(
+            training_spectrogram_paths, training_targets, training_target_classes, training_sample_qualities, training_sps = torch_datasets.prepare_data(
                 df.loc[training_idx],
                 spectrogram_dataset_path=spectrogram_dataset_path,
             )
-            validation_spectrogram_paths, validation_targets, validation_target_classes, validation_sample_qualities = torch_datasets.prepare_data(
+            validation_spectrogram_paths, validation_targets, validation_target_classes, validation_sample_qualities, validation_sps = torch_datasets.prepare_data(
                 df=df.loc[validation_idx],
                 spectrogram_dataset_path=spectrogram_dataset_path
             )
@@ -337,6 +355,7 @@ if __name__ == '__main__':
                 targets=training_targets,
                 target_classes=training_target_classes,
                 sample_qualities=training_sample_qualities,
+                eeg_offset_seconds=training_sps,
                 log_transform=config['transforms']['log_transform'],
                 center_idx=config['transforms']['center_idx'],
                 transforms=dataset_transforms['training'],
@@ -358,6 +377,7 @@ if __name__ == '__main__':
                 targets=validation_targets,
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
+                eeg_offset_seconds=validation_sps,
                 log_transform=config['transforms']['log_transform'],
                 center_idx=config['transforms']['center_idx'],
                 transforms=dataset_transforms['inference'],
@@ -501,7 +521,7 @@ if __name__ == '__main__':
             validation_idx = df.loc[df[fold] == 1].index
 
             # Create validation inputs and targets
-            validation_spectrogram_paths, validation_targets, validation_target_classes, validation_sample_qualities = torch_datasets.prepare_data(
+            validation_spectrogram_paths, validation_targets, validation_target_classes, validation_sample_qualities, validation_sps = torch_datasets.prepare_data(
                 df=df.loc[validation_idx],
                 spectrogram_dataset_path=spectrogram_dataset_path
             )
@@ -519,6 +539,7 @@ if __name__ == '__main__':
                 targets=validation_targets,
                 target_classes=validation_target_classes,
                 sample_qualities=validation_sample_qualities,
+                eeg_offset_seconds=validation_sps,
                 log_transform=config['transforms']['log_transform'],
                 center_idx=config['transforms']['center_idx'],
                 transforms=dataset_transforms['inference'],

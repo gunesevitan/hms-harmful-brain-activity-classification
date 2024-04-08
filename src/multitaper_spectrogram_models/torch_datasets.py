@@ -1,4 +1,4 @@
-from glob import glob
+import random
 import numpy as np
 import pandas as pd
 import torch
@@ -9,7 +9,7 @@ class MultitaperSpectrogramDataset(Dataset):
 
     def __init__(
             self,
-            spectrogram_paths, targets, target_classes, sample_qualities,
+            spectrogram_paths, targets, target_classes, sample_qualities, eeg_offset_seconds,
             log_transform, center_idx, transforms=None,
             stationary_period_random_subsample_probability=0.,
             mixup_alpha=2, mixup_probability=0., mixup_center_probability=0.
@@ -19,6 +19,7 @@ class MultitaperSpectrogramDataset(Dataset):
         self.targets = targets
         self.target_classes = target_classes
         self.sample_qualities = sample_qualities
+        self.eeg_offset_seconds = eeg_offset_seconds
 
         self.log_transform = log_transform
         self.center_idx = center_idx
@@ -63,27 +64,20 @@ class MultitaperSpectrogramDataset(Dataset):
             Tensor of encoded target
         """
 
+        spectrogram_path = self.spectrogram_paths[idx]
+        eeg_offset_seconds = self.eeg_offset_seconds[idx]
+        num_sps = len(eeg_offset_seconds)
         if np.random.rand() < self.stationary_period_random_subsample_probability:
-
-            current_spectrogram_path = self.spectrogram_paths[idx]
-
-            # Extract same stationary period subsample paths from the spectrogram id
-            spectrogram_id_path = '_'.join(current_spectrogram_path.split('_')[:2])
-            stationary_period_spectrogram_paths = glob(f'{spectrogram_id_path}*')
-            stationary_period_spectrogram_paths = [path for path in stationary_period_spectrogram_paths if path != current_spectrogram_path]
-
-            if len(stationary_period_spectrogram_paths) > 1:
-                # Randomly select a spectrogram from the subsample paths
-                spectrogram_path = np.random.choice(stationary_period_spectrogram_paths)
-            else:
-                spectrogram_path = current_spectrogram_path
+            sp_ind = random.randint(0, num_sps - 1)
         else:
-            spectrogram_path = self.spectrogram_paths[idx]
+            sp_ind = num_sps // 2
 
+        eeg_sp = int((eeg_offset_seconds[sp_ind] - eeg_offset_seconds[0]) * 2)
         spectrogram = read_spectrogram(
             spectrogram_path=spectrogram_path,
             log_transform=self.log_transform
         )
+        spectrogram = spectrogram[:, :, eeg_sp:eeg_sp + 93]
 
         if self.targets is not None:
             targets = self.targets[idx]
@@ -157,7 +151,7 @@ def read_spectrogram(spectrogram_path, log_transform=False):
         Array of spectrogram
     """
 
-    spectrogram = np.load(spectrogram_path)
+    spectrogram = np.load(spectrogram_path)['arr']
 
     if log_transform:
         spectrogram = np.log1p(spectrogram)
@@ -191,9 +185,12 @@ def prepare_data(df, spectrogram_dataset_path):
 
     sample_qualities: numpy.ndarray of shape (n_samples)
         Array of sample qualities
+
+    eeg_offset_seconds: numpy.ndarray of shape (n_samples)
+        Array of sps
     """
 
-    df['spectrogram_file_name'] = df['eeg_id'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
+    df['spectrogram_file_name'] = df['eeg_id'].index.astype('str') + '_multitaper_spec.npz'
     df['spectrogram_path'] = df['spectrogram_file_name'].apply(lambda x: str(spectrogram_dataset_path) + '/spectrograms/' + x)
     spectrogram_paths = df['spectrogram_path'].values
 
@@ -208,5 +205,6 @@ def prepare_data(df, spectrogram_dataset_path):
         'Other': 5
     })).astype(np.uint8).values
     sample_qualities = df['sample_quality'].values
+    eeg_offset_seconds = df['eeg_label_offset_seconds'].values
 
-    return spectrogram_paths, targets, target_classes, sample_qualities
+    return spectrogram_paths, targets, target_classes, sample_qualities, eeg_offset_seconds
