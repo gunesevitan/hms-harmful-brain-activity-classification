@@ -63,7 +63,7 @@ def get_spectrogram(signal, fs, nperseg, noverlap, frequency_range):
 
 if __name__ == '__main__':
 
-    dataset_directory = settings.DATA / 'eeg_spectrograms-50-30-10-second'
+    dataset_directory = settings.DATA / 'eeg_spectrograms-avg'
     dataset_directory.mkdir(parents=True, exist_ok=True)
     (dataset_directory / 'spectrograms').mkdir(parents=True, exist_ok=True)
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     df_train = pd.read_csv(settings.DATA / 'hms-harmful-brain-activity-classification' / 'train.csv')
 
-    time_stack = '50/30/10'
+    time_stack = 'spec_avg'
     visualize = False
 
     for eeg_id, df_train_eeg in tqdm(df_train.groupby('eeg_id'), total=df_train['eeg_id'].nunique()):
@@ -83,10 +83,11 @@ if __name__ == '__main__':
         for _, row in df_train_eeg.iterrows():
 
             eeg_sub_id = row['eeg_sub_id']
+            stationary_period = row['stationary_period']
             start_idx = int(row['eeg_label_offset_seconds'] * 200)
             end_idx = int((row['eeg_label_offset_seconds'] + 50) * 200)
             df_eeg_subsample = df_eeg.iloc[start_idx:end_idx].reset_index(drop=True)
-            spectrogram_file_path = dataset_directory / 'spectrograms' / f'{eeg_id}_{eeg_sub_id}.npy'
+            spectrogram_file_path = dataset_directory / 'spectrograms' / f'{eeg_id}_{stationary_period}_{eeg_sub_id}.npy'
 
             eeg = df_eeg_subsample.values
             eeg = get_eeg_differences(eeg)
@@ -147,19 +148,93 @@ if __name__ == '__main__':
                         frequency_range=(0.5, 20),
                     )
                     spectrograms.append(spectrogram_10)
+
+                elif time_stack == '30/10':
+
+                    spectrogram_30 = get_spectrogram(
+                        signal=eeg[2000:8000, signal_idx],
+                        fs=200,
+                        nperseg=145,
+                        noverlap=133,
+                        frequency_range=(0.5, 20),
+                    )[:, 12:-12]
+                    spectrograms.append(spectrogram_30)
+
+                    spectrogram_10 = get_spectrogram(
+                        signal=eeg[4000:6000, signal_idx],
+                        fs=200,
+                        nperseg=145,
+                        noverlap=141,
+                        frequency_range=(0.5, 20),
+                    )
+                    spectrograms.append(spectrogram_10)
+
                 elif time_stack == '50':
                     # 50 second spectrogram is created
                     spectrogram_50 = get_spectrogram(
                         signal=eeg[:, signal_idx],
                         fs=200,
-                        nperseg=280,
-                        noverlap=260,
+                        nperseg=270,
+                        noverlap=251,
                         frequency_range=(0.5, 20),
+                    )
 
+                    spectrograms.append(spectrogram_50)
+
+                elif time_stack == '30':
+                    # 50 second spectrogram is created
+                    spectrogram_30 = get_spectrogram(
+                        signal=eeg[2000:8000, signal_idx],
+                        fs=200,
+                        nperseg=289,
+                        noverlap=278,
+                        frequency_range=(0.5, 20),
+                    )[:, 4:-4]
+                    spectrograms.append(spectrogram_30)
+
+                elif time_stack == 'spec_avg':
+
+                    spectrogram_50 = get_spectrogram(
+                        signal=eeg[:, signal_idx],
+                        fs=200,
+                        nperseg=1040,
+                        noverlap=1022,
+                        frequency_range=(0.5, 20),
                     )
                     spectrograms.append(spectrogram_50)
 
             spectrograms = np.concatenate(spectrograms, axis=0)
+
+            if time_stack == 'spec_avg':
+                spectrograms_ll = np.stack([
+                    spectrograms[0 * 102:1 * 102],
+                    spectrograms[1 * 102:2 * 102],
+                    spectrograms[2 * 102:3 * 102],
+                    spectrograms[3 * 102:4 * 102]
+                ], axis=0).mean(axis=0)
+                spectrograms_rl = np.stack([
+                    spectrograms[4 * 102:5 * 102],
+                    spectrograms[5 * 102:6 * 102],
+                    spectrograms[6 * 102:7 * 102],
+                    spectrograms[7 * 102:8 * 102]
+                ], axis=0).mean(axis=0)
+                spectrograms_lp = np.stack([
+                    spectrograms[8 * 102:9 * 102],
+                    spectrograms[9 * 102:10 * 102],
+                    spectrograms[10 * 102:11 * 102],
+                    spectrograms[11 * 102:12 * 102]
+                ], axis=0).mean(axis=0)
+                spectrograms_rp = np.stack([
+                    spectrograms[12 * 102:13 * 102],
+                    spectrograms[13 * 102:14 * 102],
+                    spectrograms[14 * 102:15 * 102],
+                    spectrograms[15 * 102:16 * 102]
+                ], axis=0).mean(axis=0)
+                spectrograms_center = np.stack([
+                    spectrograms[16 * 102:17 * 102],
+                    spectrograms[17 * 102:18 * 102],
+                ], axis=0).mean(axis=0)
+                spectrograms = np.vstack([spectrograms_ll, spectrograms_rl, spectrograms_lp, spectrograms_rp, spectrograms_center])
 
             np.save(spectrogram_file_path, spectrograms)
 
