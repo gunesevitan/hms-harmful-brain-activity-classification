@@ -6,7 +6,7 @@ import pandas as pd
 
 sys.path.append('..')
 import settings
-from eeg_to_multitaper_spectrogram import multitaper_spectrogram
+from multitaper_spectrogram_python import multitaper_spectrogram
 
 
 def get_eeg_differences(eeg):
@@ -46,7 +46,7 @@ def get_eeg_differences(eeg):
 
 if __name__ == '__main__':
 
-    dataset_directory = settings.DATA / 'eeg_multitaper_spectrograms'
+    dataset_directory = settings.DATA / 'eeg_spectrograms-multitaper'
     dataset_directory.mkdir(parents=True, exist_ok=True)
     (dataset_directory / 'spectrograms').mkdir(parents=True, exist_ok=True)
     (dataset_directory / 'spectrograms_center').mkdir(parents=True, exist_ok=True)
@@ -59,9 +59,7 @@ if __name__ == '__main__':
     for eeg_id, df_train_eeg in tqdm(df_train.groupby('eeg_id'), total=df_train['eeg_id'].nunique()):
 
         df_eeg = pd.read_parquet(eeg_directory / f'{eeg_id}.parquet')
-        # df_eeg = df_eeg.interpolate(method='linear', limit_area='inside').fillna(0)
-
-        df_eeg = df_eeg.fillna(0)
+        df_eeg = df_eeg.interpolate(method='linear', limit_area='inside').fillna(0)
 
         eeg_label_offset_seconds = df_train_eeg['eeg_label_offset_seconds'].tolist()
         eeg_label_offset_seconds.sort()
@@ -97,25 +95,26 @@ if __name__ == '__main__':
             )
             spectrograms_center.append(spect_center)
 
-        spectrograms = np.concatenate(spectrograms, axis=0)
-        spectrograms_center = np.concatenate(spectrograms_center, axis=0)
+        spectrograms = np.stack(spectrograms, axis=0)
+        spectrograms_center = np.stack(spectrograms_center, axis=0)
 
-        for i, row in df_train_eeg.iterrows():
+        for i, row in df_train_eeg.reset_index().iterrows():
+
             eeg_sub_id = row['eeg_sub_id']
             spectrogram_file_path = dataset_directory / 'spectrograms' / f'{eeg_id}_{eeg_sub_id}.npy'
             spectrogram_center_file_path = dataset_directory / 'spectrograms_center' / f'{eeg_id}_{eeg_sub_id}.npy'
 
             sp_idx = int((eeg_label_offset_seconds[i] - eeg_label_offset_seconds[0]) * 2)
-            np.save(spectrogram_file_path, spectrograms[:, :, sp_idx + sp_idx + 93])
+            np.save(spectrogram_file_path, spectrograms[:, :, sp_idx : sp_idx + c])
 
             sp_center_idx = i * 20
-            np.save(spectrogram_center_file_path, spectrograms_center[:, :, sp_center_idx + sp_center_idx + 13])
+            np.save(spectrogram_center_file_path, spectrograms_center[:, :, sp_center_idx : sp_center_idx + 13])
 
-            # spectrograms = np.log1p(spectrograms)
-            # mean = spectrograms.mean()
-            # std = spectrograms.std()
-            # min = spectrograms.min()
-            # max = spectrograms.max()
-            # spec_id = str(spectrogram_file_path).split('/')[-1]
-            # visualization.visualize_spectrogram(np.log1p(spectrograms), f'Spectrogram {spec_id} - Mean: {mean:.2f} Std: {std:.2f} Min: {min:.2f} Max: {max:.2f}')
-            # exit()
+            import visualization
+            spectrograms = np.log1p(spectrograms)
+            mean = spectrograms.mean()
+            std = spectrograms.std()
+            min = spectrograms.min()
+            max = spectrograms.max()
+            spec_id = str(spectrogram_file_path).split('/')[-1]
+            visualization.visualize_spectrogram(np.log1p(spectrograms), f'Spectrogram {spec_id} - Mean: {mean:.2f} Std: {std:.2f} Min: {min:.2f} Max: {max:.2f}')
