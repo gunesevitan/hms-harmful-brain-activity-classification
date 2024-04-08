@@ -270,3 +270,35 @@ def visualize_confusion_matrix(y_true, y_pred, title, path=None):
     else:
         plt.savefig(path)
         plt.close(fig)
+
+
+def visualize_spectrogram(spectrogram, title, path=None):
+
+    """
+    Visualize the given spectrogram
+
+    Parameters
+    ----------
+    spectrogram: numpy.ndarray of shape (frequency, time, channel) or (frequency, time)
+        Spectrogram array
+
+    title: str
+        Title of the plot
+
+    path: str or None
+        Path of the output file or None (if path is None, plot is displayed with selected backend)
+    """
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.imshow(spectrogram, cmap=plt.cm.coolwarm)
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.tick_params(axis='x', labelsize=15, pad=10)
+    ax.tick_params(axis='y', labelsize=15, pad=10)
+    ax.set_title(title, size=15, pad=12.5, loc='center', wrap=True)
+
+    if path is None:
+        plt.show()
+    else:
+        plt.savefig(path)
+        plt.close(fig)
