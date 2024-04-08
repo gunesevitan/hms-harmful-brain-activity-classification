@@ -1,0 +1,94 @@
+dataset:
+  spectrogram_dataset: 'eeg_spectrograms-50-10-second'
+  normalize_targets: True
+
+model:
+  model_class: 'ConvNeXt'
+  model_args:
+    model_name: 'convnext_base'
+    pretrained: True
+    backbone_args:
+      in_chans: 1
+      drop_rate: 0.1
+      drop_path_rate: 0.1
+    pooling_type: 'avg'
+    dropout_rate: 0.
+    head_args:
+      output_dimensions: 6
+  model_checkpoint_paths: [
+    null,
+    null,
+    null,
+    null,
+    null
+  ]
+
+training:
+  folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
+  training_sample_qualities: [0, 1, 2]
+  input_dimensions: 2
+  loss_function: 'BCEWithLogitsLoss'
+  loss_function_args: {}
+  training_batch_size: 16
+  test_batch_size: 32
+  num_workers: 16
+  random_state: 42
+  deterministic_cudnn: False
+  device: 'cuda'
+  task_type: 'binary'
+  optimizer: 'AdamW'
+  optimizer_args:
+    lr: 0.00025
+    betas: [0.9, 0.999]
+    weight_decay: 0.0001
+  lr_scheduler: 'CosineAnnealingLR'
+  lr_scheduler_args:
+    T_max: 4000
+    eta_min: 0.00001
+    last_epoch: -1
+  amp: True
+  epochs: 5
+  early_stopping_metric: 'kl_divergence'
+  early_stopping_patience: 0
+
+test:
+  folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
+  model_file_names: [
+    'model_fold_1_epoch_4_best_kl_divergence_0.4973.pt',
+    'model_fold_2_epoch_4_best_kl_divergence_0.5066.pt',
+    'model_fold_3_epoch_4_best_kl_divergence_0.5188.pt',
+    'model_fold_4_epoch_4_best_kl_divergence_0.5391.pt',
+    'model_fold_5_epoch_3_best_kl_divergence_0.5402.pt'
+  ]
+  tta: True
+  tta_flip_dimensions: [[2], [3], [2, 3]]
+
+transforms:
+  log_transform: True
+  center_idx: [0, -1]
+  stationary_period_random_subsample_probability: 1.0
+  mixup_alpha: 2
+  mixup_probability: 0.
+  mixup_center_probability: 0.
+  vertical_flip_probability: 0.5
+  horizontal_flip_probability: 0.5
+  center_temporal_dropout_time_steps: 1
+  center_temporal_dropout_probability: 0.
+  non_center_temporal_dropout_time_steps: 100
+  non_center_temporal_dropout_probability: 0.
+  n_frequencies: 25
+  n_consecutive: 0
+  frequency_dropout_probability: 0.
+  coarse_dropout_max_holes: 16
+  coarse_dropout_min_holes: 8
+  coarse_dropout_max_height: 8
+  coarse_dropout_max_width: 8
+  coarse_dropout_min_height: 4
+  coarse_dropout_min_width: 4
+  coarse_dropout_probability: 0.
+  pad_min_height: 512
+  pad_min_width: 512
+
+persistence:
+  save_best_metrics: ['kl_divergence']
+  save_epochs: []

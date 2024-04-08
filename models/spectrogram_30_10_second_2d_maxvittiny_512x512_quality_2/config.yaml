@@ -1,0 +1,95 @@
+dataset:
+  spectrogram_dataset: 'eeg_spectrograms-30-10-second'
+  normalize_targets: True
+
+model:
+  model_class: 'CoAtNet'
+  model_args:
+    model_name: 'maxvit_tiny_rw_224'
+    pretrained: True
+    backbone_args:
+      img_size: [512, 512]
+      in_chans: 1
+      drop_rate: 0.1
+      drop_path_rate: 0.1
+    pooling_type: 'avg'
+    dropout_rate: 0.
+    head_args:
+      output_dimensions: 6
+  model_checkpoint_paths: [
+    'spectrogram_30_10_second_2d_maxvittiny_512x512_quality_012_pretraining/model_fold_1_epoch_4_best_kl_divergence_0.5055.pt',
+    'spectrogram_30_10_second_2d_maxvittiny_512x512_quality_012_pretraining/model_fold_2_epoch_4_best_kl_divergence_0.5036.pt',
+    'spectrogram_30_10_second_2d_maxvittiny_512x512_quality_012_pretraining/model_fold_3_epoch_4_best_kl_divergence_0.5339.pt',
+    'spectrogram_30_10_second_2d_maxvittiny_512x512_quality_012_pretraining/model_fold_4_epoch_3_best_kl_divergence_0.5611.pt',
+    'spectrogram_30_10_second_2d_maxvittiny_512x512_quality_012_pretraining/model_fold_5_epoch_4_best_kl_divergence_0.5296.pt'
+  ]
+
+training:
+  folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
+  training_sample_qualities: [2]
+  input_dimensions: 2
+  loss_function: 'BCEWithLogitsLoss'
+  loss_function_args: {}
+  training_batch_size: 16
+  test_batch_size: 32
+  num_workers: 16
+  random_state: 0
+  deterministic_cudnn: False
+  device: 'cuda'
+  task_type: 'binary'
+  optimizer: 'AdamW'
+  optimizer_args:
+    lr: 0.0003
+    betas: [0.9, 0.999]
+    weight_decay: 0.0001
+  lr_scheduler: 'CosineAnnealingLR'
+  lr_scheduler_args:
+    T_max: 2000
+    eta_min: 0.00001
+    last_epoch: -1
+  amp: True
+  epochs: 10
+  early_stopping_metric: 'sq_2_kl_divergence'
+  early_stopping_patience: 0
+
+test:
+  folds: ['fold1', 'fold2', 'fold3', 'fold4', 'fold5']
+  model_file_names: [
+    'model_fold_1_epoch_6_best_sq_2_kl_divergence_0.2548.pt',
+    'model_fold_2_epoch_6_best_sq_2_kl_divergence_0.2264.pt',
+    'model_fold_3_epoch_7_best_sq_2_kl_divergence_0.2306.pt',
+    'model_fold_4_epoch_8_best_sq_2_kl_divergence_0.2491.pt',
+    'model_fold_5_epoch_6_best_sq_2_kl_divergence_0.2483.pt'
+  ]
+  tta: True
+  tta_flip_dimensions: [[2], [3], [2, 3]]
+
+transforms:
+    log_transform: True
+    center_idx: [0, -1]
+    stationary_period_random_subsample_probability: 1.0
+    mixup_alpha: 2
+    mixup_probability: 0.05
+    mixup_center_probability: 0.5
+    vertical_flip_probability: 0.5
+    horizontal_flip_probability: 0.5
+    center_temporal_dropout_time_steps: 1
+    center_temporal_dropout_probability: 0.
+    non_center_temporal_dropout_time_steps: 100
+    non_center_temporal_dropout_probability: 0.
+    n_frequencies: 25
+    n_consecutive: 0
+    frequency_dropout_probability: 0.
+    coarse_dropout_max_holes: 16
+    coarse_dropout_min_holes: 8
+    coarse_dropout_max_height: 8
+    coarse_dropout_max_width: 8
+    coarse_dropout_min_height: 4
+    coarse_dropout_min_width: 4
+    coarse_dropout_probability: 0.
+    pad_min_height: 512
+    pad_min_width: 512
+
+persistence:
+  save_best_metrics: ['sq_2_kl_divergence']
+  save_epochs: []
