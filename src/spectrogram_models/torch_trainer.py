@@ -320,9 +320,6 @@ if __name__ == '__main__':
 
             fold_pseudo_label_columns = [column for column in df.columns.tolist() if column.endswith(f'_{fold}')]
 
-            if config['training']['use_pseudo_labels']:
-                df.loc[df['sample_quality'] < 2, target_columns] = df.loc[df['sample_quality'] < 2, fold_pseudo_label_columns].values
-
             training_idx, validation_idx = df.loc[df[fold] != 1].index, df.loc[df[fold] == 1].index
             # Validate on training set if validation is set is not specified
             if len(validation_idx) == 0:

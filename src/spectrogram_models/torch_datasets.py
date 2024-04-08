@@ -68,7 +68,7 @@ class SpectrogramDataset(Dataset):
             current_spectrogram_path = self.spectrogram_paths[idx]
 
             # Extract same stationary period subsample paths from the spectrogram id
-            spectrogram_id_path = '_'.join(current_spectrogram_path.split('_')[:2])
+            spectrogram_id_path = '_'.join(current_spectrogram_path.split('_')[:3])
             stationary_period_spectrogram_paths = glob(f'{spectrogram_id_path}*')
             stationary_period_spectrogram_paths = [path for path in stationary_period_spectrogram_paths if path != current_spectrogram_path]
 
@@ -193,7 +193,7 @@ def prepare_data(df, spectrogram_dataset_path):
         Array of sample qualities
     """
 
-    df['spectrogram_file_name'] = df['eeg_id'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
+    df['spectrogram_file_name'] = df['eeg_id'].astype(str) + '_' + df['stationary_period'].astype(str) + '_' + df['eeg_sub_id'].astype(str) + '.npy'
     df['spectrogram_path'] = df['spectrogram_file_name'].apply(lambda x: str(spectrogram_dataset_path) + '/spectrograms/' + x)
     spectrogram_paths = df['spectrogram_path'].values
 
